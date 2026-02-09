@@ -1,0 +1,13 @@
+fastapi[standard]
+python-dotenv
+
+# Database
+sqlmodel
+psycopg[binary]
+
+# Security
+pyjwt
+pwdlib[argon2]
+
+# Testing
+pytest
