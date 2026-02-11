@@ -1,5 +1,5 @@
 from typing import Annotated, TYPE_CHECKING
-from sqlmodel import SQLModel, Relationship, Field
+from sqlmodel import Relationship, Field
 from .schemas import ItemBase
 
 if TYPE_CHECKING:

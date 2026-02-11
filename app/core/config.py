@@ -8,11 +8,11 @@ class Settings(BaseSettings):
     POSTGRES_URL: PostgresDsn
     SECRET_KEY: str
     TOKEN_EXPIRY_MIN: int
+    TOKEN_ENCODE_ALGORITHM: str
     
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,
         env_file_encoding="utf-8",
-        extra="ignore"
     )
     
 settings = Settings() # type: ignore

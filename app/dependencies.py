@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from typing import Annotated
-from sqlmodel import Session, select
+from sqlmodel import Session
 from pydantic import BaseModel, ValidationError
 from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime

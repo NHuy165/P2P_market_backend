@@ -6,11 +6,17 @@ from datetime import datetime, timezone
 
 # ====================== BASE ====================== #
 
-class Status(Enum):
+class OrderStatus(Enum):
     PENDING = "PENDING"
     CANCELLED = "CANCELLED"
     SHIPPED = "SHIPPED"
     DELIVERED = "DELIVERED"
+    
+class TransactionType(Enum):
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    SALE = "SALE"
+    PURCHASE = "PURCHASE"
 
 # User base
 class UserBase(SQLModel):
@@ -28,15 +34,14 @@ class OrderBase(SQLModel):
     quantity: Annotated[int, Field(gt=0)]
     price_per_item: Annotated[float, Field(gt=0)] # Prevents price changes
     
+# Transaction base
+class TransactionBase(SQLModel):
+    amount: Annotated[float, Field(gt=0)]
+    
 # ====================== INPUT ====================== #
 
 # User input (account creation)
 class UserInput(UserBase):
-    email: EmailStr
-    password: Annotated[str, Field(min_length=8)]
-    
-# User input (account login)
-class UserLogin(SQLModel):
     email: EmailStr
     password: Annotated[str, Field(min_length=8)]
 
@@ -70,10 +75,11 @@ class OrderOutput(OrderBase):
     buyer: UserOutput
     seller: UserOutput
     
-    status: Status
+    status: OrderStatus
     created_at: datetime
     
 # ====================== SPECIAL OUTPUT ====================== #
+# These inputs are only shown to special accounts
 
 # User profile shown to account owner and admins    
 class UserOutputSpecial(UserOutput):
@@ -84,8 +90,15 @@ class UserOutputSpecial(UserOutput):
     items: list[ItemOutput]
     
 # Item shown to users with its seller included
-class ItemOutputWithUser(ItemOutput):
-    user: UserOutput
+class ItemOutputWithSeller(ItemOutput):
+    seller: UserOutput
+    
+# Transaction history shown to account owner and admins
+class TranstionOutput(TransactionBase):
+    id: int
+    type: TransactionType
+    user_id: int
+    created_at: datetime
 
 # ====================== UPDATE ====================== #
 
@@ -104,9 +117,7 @@ class ItemUpdate(ItemBase):
     stock_quantity_relative: int | None = None
     
 # Order update schema. Buyer, seller and item cannot be changed.
-class Order(OrderBase):
+class OrderUpdate(OrderBase):
     quantity: Annotated[int | None, Field(gt=0)] = None
     price_per_item: Annotated[float | None, Field(gt=0)] = None
-    
-    status: Status | None = None
-    created_at: Annotated[datetime, Field(default_factory=lambda: datetime.now(timezone.utc))]
+    status: OrderStatus | None = None
