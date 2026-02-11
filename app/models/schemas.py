@@ -30,8 +30,13 @@ class OrderBase(SQLModel):
     
 # ====================== INPUT ====================== #
 
-# User input by user (account creation and login)
+# User input (account creation)
 class UserInput(UserBase):
+    email: EmailStr
+    password: Annotated[str, Field(min_length=8)]
+    
+# User input (account login)
+class UserLogin(SQLModel):
     email: EmailStr
     password: Annotated[str, Field(min_length=8)]
 
