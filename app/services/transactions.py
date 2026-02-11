@@ -16,7 +16,7 @@ def change_money(amount: float, current_user: User, trans_type: TransactionType,
     
     if trans_type.value in ("WITHDRAWAL", "PURCHASE"):
         if user.balance < amount:
-            raise ExceptionNegativeBalance
+            raise ExceptionNegativeBalance()
         user.balance -= amount
         
     else:

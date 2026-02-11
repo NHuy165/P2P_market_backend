@@ -1,6 +1,5 @@
 from sqlmodel import create_engine, SQLModel, Session
 
-from .models import items, orders, users
 from .core.security import settings
 
 engine = create_engine(str(settings.POSTGRES_URL), echo=True)

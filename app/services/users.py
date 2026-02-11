@@ -18,14 +18,14 @@ def check_name_exists(username: str, session: Session):
     result = session.exec(check).first()
     
     if result is not None:
-        raise ExceptionTakenName     
+        raise ExceptionTakenName()
         
 def check_email_exists(email: EmailStr, session: Session):
     check = select(User).where(User.email == email)
     result = session.exec(check).first()
     
     if result is not None:
-        raise ExceptionTakenEmail
+        raise ExceptionTakenEmail()
 
 def register_user_service(user: UserInput, session: Session) -> User:
     check_name_exists(user.username, session)

@@ -14,7 +14,7 @@ def login_service(email: EmailStr, password: str, session: Session) -> str:
     
     # Check if email exists and password is correct
     if check_email_result is None or not verify_hashed(password, check_email_result.hashed_password):
-        raise Exception_Auth("Couldn't validate credentials")
+        raise Exception_Auth()
 
     # Credentials correct
     data = {"sub": str(check_email_result.id)} # By convention, sub is of type string
