@@ -1,38 +1,36 @@
 from sqlmodel import select, Session
 
 from ..models.users import User
-from ..models.schemas import TransactionType
+from ..models.schemas import TransactionType, TransactionInput
 from ..models.transactions import Transaction
+from ..exceptions import *
 
 # ----- Balance operations ----- #
 
-class ExceptionNegativeBalance(Exception):
-    pass
-
-def change_money(amount: float, current_user: User, trans_type: TransactionType, session: Session) -> User:
+def change_money(inp: TransactionInput, current_user: User, trans_type: TransactionType, session: Session) -> Transaction:
     # Prevents multiple requests at the same time
     user = session.get(User, current_user.id, with_for_update=True)
     assert user is not None
     
-    if trans_type.value in ("WITHDRAWAL", "PURCHASE"):
-        if user.balance < amount:
-            raise ExceptionNegativeBalance()
-        user.balance -= amount
+    if trans_type.value in (TransactionType.WITHDRAWAL, TransactionType.PURCHASE):
+        if user.balance < inp.amount:
+            raise ExceptionNegativeValue()
+        user.balance -= inp.amount
         
     else:
-        user.balance += amount
+        user.balance += inp.amount
         
     trans = Transaction(
-            amount=amount,
+            amount=inp.amount,
             type=trans_type,
             user=user
         )
     
     session.add(trans)
     session.commit()
-    session.refresh(user)
+    session.refresh(trans)
     
-    return user
+    return trans
 
 # ----- Display transactions history ----- #
 

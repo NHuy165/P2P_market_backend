@@ -20,7 +20,7 @@ def login(user: Annotated[OAuth2PasswordRequestForm, Depends()], session: Annota
         access_token = login_service(user.username, user.password, session)
         return Token(access_token=access_token, token_type="bearer")
     
-    except Exception_Auth:
+    except ExceptionAuth:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

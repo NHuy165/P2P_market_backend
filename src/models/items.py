@@ -9,7 +9,11 @@ if TYPE_CHECKING:
 # Item in database
 class Item(ItemBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
-    seller_id: Annotated[int, Field(foreign_key="user.id")]
+    seller_id: Annotated[int | None, Field(foreign_key="user.id")] = None
+    
+    is_active: bool = False
+    is_deleted: bool = False
+    is_banned: bool = False
     
     user: Annotated['User', Relationship(back_populates='items')] # The user this item belongs to
     orders: Annotated[list['Order'], Relationship(back_populates='item')] # The orders associated with this item

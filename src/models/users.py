@@ -14,10 +14,13 @@ class User(UserBase, table=True):
     
     hashed_password: Annotated[str, Field(min_length=8)]
     email: EmailStr
+    balance: float = 0
     
     is_active: bool = True
     is_admin: bool = False
-    balance: float = 0
+    is_banned: bool = False
+    is_deleted: bool = False
+    
     
     items: Annotated[list["Item"], Relationship(back_populates="user")] # Items in stock
     buy_orders: Annotated[list["Order"], Relationship(back_populates="buyer")] # Associated buy orders
