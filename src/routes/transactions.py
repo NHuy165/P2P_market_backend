@@ -34,7 +34,7 @@ def withdraw(user: UserDep, session: SessionDep, inp: TransactionInput):
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-# ----- Deposit and withdraw (dummy functions) ----- #
+# ----- Display transactions history ----- #
 
 @router.get("/history", response_model=list[TransactionOutput])
 def display_history(user: UserDep, session: SessionDep):

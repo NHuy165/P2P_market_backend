@@ -15,6 +15,6 @@ class Item(ItemBase, table=True):
     is_deleted: bool = False
     is_banned: bool = False
     
-    user: Annotated['User', Relationship(back_populates='items')] # The user this item belongs to
+    seller: Annotated['User', Relationship(back_populates='items')] # The user this item belongs to
     orders: Annotated[list['Order'], Relationship(back_populates='item')] # The orders associated with this item
     

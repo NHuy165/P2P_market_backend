@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Path, Query
 from typing import Annotated
 from sqlmodel import Session
 
 from ..dependencies import get_current_user
 from ..database import get_session
 from ..models.users import User
-from ..models.schemas import ItemInput, ItemOutput, ItemUpdate, ItemOutputSpecial
-from ..services.items import create_item_service, edit_item_service, get_personal_items_service, get_public_items_service, delete_item_service
+from ..models.schemas import ItemInput, ItemOutput, ItemUpdate, ItemOutputSpecial, ItemFilterSpecial, ItemFilterPublic
+from ..services.items import create_item_service, edit_item_service, get_personal_items_all_service, get_public_items_all_service, get_personal_item_specific_service, get_public_item_specific_service, delete_item_service
 from ..exceptions import *
 
 router = APIRouter()
@@ -14,7 +14,7 @@ router = APIRouter()
 UserDep = Annotated[User, Depends(get_current_user)]
 SessionDep = Annotated[Session, Depends(get_session)]
 
-# ----- Item listing creation ----- #
+# ----- Item listing create ----- #
 
 @router.post("/create", response_model=ItemOutputSpecial)
 def create_item(user: UserDep, session: SessionDep, item: ItemInput):
@@ -28,13 +28,56 @@ def create_item(user: UserDep, session: SessionDep, item: ItemInput):
             detail="Another item listing in your account with this name already exists.",
             headers={"WWW-Authenticate": "Bearer"}
         )
-        
-# ----- Item listing edit ----- #
+                
+# ----- Item listing read ----- #
+
+@router.get("/my-items/", response_model=list[ItemOutputSpecial])
+def get_personal_items_all(user: UserDep, session: SessionDep):
+    assert user.id is not None
+    return get_personal_items_all_service(user.id, session)
+
+@router.get("/my-items", response_model=list[ItemOutputSpecial])
+def get_personal_items_all_filtered(user: UserDep, session: SessionDep, filter: Annotated[ItemFilterSpecial, Query()]):
+    assert user.id is not None
+    return get_personal_items_all_service(user.id, session, filter)
+
+@router.get("/my-items/{item_id}", response_model=ItemOutputSpecial)
+def get_personal_item_specific(user: UserDep, session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
+    try:
+        assert user.id is not None
+        return get_personal_item_specific_service(user.id, session, item_id)
+    except ExceptionNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Couldn't find item with specified id",
+        )
+
+# These functions don't require user to be logged in
+@router.get("/", response_model=list[ItemOutput])
+def get_public_items_all(session: SessionDep):
+    return get_public_items_all_service(session)
+
+@router.get("", response_model=list[ItemOutput])
+def get_public_items_all_filtered(session: SessionDep, filter: Annotated[ItemFilterPublic, Query()]):
+    return get_public_items_all_service(session, filter)
+
+@router.get("/{item_id}", response_model=ItemOutput)
+def get_public_item_specific(session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
+    try:
+        return get_public_item_specific_service(session, item_id)
+    except ExceptionNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Couldn't find item with specified id",
+        )
+
+# ----- Item listing update and delete ----- #
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_item(user: UserDep, session: SessionDep, item_id: int):
     try:
-        delete_item_service(user, session, item_id)
+        assert user.id is not None
+        delete_item_service(user.id, session, item_id)
         
     except ExceptionNotFound:
         raise HTTPException(
@@ -63,7 +106,8 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
     
     # Checks for error from service function
     try:
-        new_item = edit_item_service(user, session, item_id, item_update)
+        assert user.id is not None
+        new_item = edit_item_service(user.id, session, item_id, item_update)
         return new_item
         
     except ExceptionNotFound:
@@ -78,18 +122,6 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
             detail="Item edit caused quantity to be negative.",
             headers={"WWW-Authenticate": "Bearer"}
         )
-        
-        
-# ----- Item listing display ----- #
-
-@router.get("/my-items", response_model=list[ItemOutputSpecial])
-def get_personal_items(user: UserDep, session: SessionDep):
-    return get_personal_items_service(user, session)
-
-# This function doesn't require user to be logged in
-@router.get("/all", response_model=list[ItemOutput])
-def get_public_items(session: SessionDep):
-    return get_public_items_service(session)
 
 
 

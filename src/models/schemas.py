@@ -1,4 +1,4 @@
-from pydantic import EmailStr
+from pydantic import EmailStr, BaseModel
 from typing import Annotated
 from sqlmodel import SQLModel, Field
 from enum import Enum
@@ -62,6 +62,8 @@ class UserOutput(UserBase):
 class ItemOutput(ItemBase):
     id: int
     seller_id: int
+    
+class ItemOutputWithSeller(ItemOutput):
     seller: UserOutput
     
 # ====================== SPECIAL OUTPUT ====================== #
@@ -79,7 +81,7 @@ class UserOutputSpecial(UserOutput):
     items: list[ItemOutput]
     
 # Item shown to account owner and admins
-class ItemOutputSpecial(ItemOutput):
+class ItemOutputSpecial(ItemOutputWithSeller):
     is_active: bool
     is_banned: bool
     is_deleted: bool
@@ -105,6 +107,38 @@ class TransactionOutput(TransactionBase):
     type: TransactionType
     user_id: int
     created_at: datetime
+
+# ====================== SEARCH ====================== #
+
+class ItemSearch(BaseModel):
+    user_id: int | None = None 
+    item_id: int | None = None
+    item_name: str | None = None
+    
+    include_banned: bool = False
+    include_deleted: bool = False
+    include_inactive: bool = False
+
+
+# ====================== FILTER ====================== #
+
+class ItemFilterBase(BaseModel):
+    name: str | None = None
+    
+    price_lower: float | None = None
+    price_upper: float | None = None
+    
+    stock_quantity_lower: float | None = None
+    stock_quantity_higher: float | None = None
+    
+class ItemFilterPublic(ItemFilterBase):
+    seller_id: int | None = None
+    seller_name: str | None = None
+    
+class ItemFilterSpecial(ItemFilterBase):
+    is_active: bool | None = None
+    is_deleted: bool | None = None
+    is_banned: bool | None = None
 
 # ====================== UPDATE ====================== #
 

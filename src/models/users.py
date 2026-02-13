@@ -22,7 +22,7 @@ class User(UserBase, table=True):
     is_deleted: bool = False
     
     
-    items: Annotated[list["Item"], Relationship(back_populates="user")] # Items in stock
+    items: Annotated[list["Item"], Relationship(back_populates="seller")] # Items in stock
     buy_orders: Annotated[list["Order"], Relationship(back_populates="buyer")] # Associated buy orders
     sell_orders: Annotated[list["Order"], Relationship(back_populates="seller")] # Associated sell orders
     transactions: Annotated[list["Transaction"], Relationship(back_populates="user")] # Associated transactions
