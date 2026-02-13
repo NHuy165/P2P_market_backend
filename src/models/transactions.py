@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 # ----- BASE ----- #
 
-class TransactionType(Enum):
+class TransactionType(str, Enum):
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
     SALE = "SALE"
@@ -20,9 +20,9 @@ class TransactionBase(SQLModel):
 class TransactionInput(TransactionBase):
     pass
     
-# ----- OUTPUT ----- #
+# ----- OUTPUT PUBLIC ----- #
     
-# ----- OUTPUT SPECIAL ----- #
+# ----- OUTPUT PRIVATE ----- #
     
 # Transaction history are only shown to account owner and admins
 class TransactionOutput(TransactionBase):
@@ -31,7 +31,7 @@ class TransactionOutput(TransactionBase):
     user_id: int
     created_at: datetime
     
-# ----- SEARCH ----- #
+# ----- SORT AND FILTER ----- #
 
 # ----- FILTER ----- #
 

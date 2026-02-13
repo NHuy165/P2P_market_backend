@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Annotated, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+from datetime import datetime, timezone
+from enum import Enum
 
 # ----- BASE ----- #
 
@@ -16,22 +18,25 @@ class ItemBase(SQLModel):
 class ItemInput(ItemBase):
     is_active: bool = False
     
-# ----- OUTPUT ----- #
+# ----- OUTPUT PUBLIC ----- #
     
-# Item shown to normal users
+# This model is only used by other classes' models to display relationships.
+# The actual item shown to the public is the class below.
 class ItemOutput(ItemBase):
     id: int
-    seller_id: int
-    
+    created_at: datetime
+
+# Item shown to normal users    
 from .users import UserOutput
-    
+
 class ItemOutputWithSeller(ItemOutput):
+    seller_id: int
     seller: UserOutput
     
-# ----- OUTPUT SPECIAL ----- #
+# ----- OUTPUT PRIVATE ----- #
     
 # Item shown to account owner and admins
-class ItemOutputSpecial(ItemOutputWithSeller):
+class ItemOutputPrivate(ItemOutputWithSeller):
     is_active: bool
     is_banned: bool
     is_deleted: bool
@@ -39,7 +44,7 @@ class ItemOutputSpecial(ItemOutputWithSeller):
 # ----- SEARCH ----- #
 
 class ItemSearch(BaseModel):
-    user_id: int | None = None 
+    seller_id: int | None = None 
     item_id: int | None = None
     item_name: str | None = None
     
@@ -47,10 +52,22 @@ class ItemSearch(BaseModel):
     include_deleted: bool = False
     include_inactive: bool = False
 
+# ----- SORT AND FILTER ----- #
 
-# ----- FILTER ----- #
+class ItemAttrSort(str, Enum):
+    item_name = "name"
+    item_price = "price"
+    item_stock_quantity = "stock_quantity"
+    item_id = "id"
+    item_seller_id = "seller_id"
+    item_created_at = "created_at"
 
-class ItemFilterBase(BaseModel):
+    # These fields are supposed to only work for private viewing but it doesn't really matter.
+    item_is_active = "is_active"
+    item_is_deleted = "is_deleted"
+    item_is_banned = "is_banned"
+    
+class ItemSortFilterBase(BaseModel):
     name: str | None = None
     
     price_lower: float | None = None
@@ -59,11 +76,17 @@ class ItemFilterBase(BaseModel):
     stock_quantity_lower: float | None = None
     stock_quantity_higher: float | None = None
     
-class ItemFilterPublic(ItemFilterBase):
+    created_at_lower: datetime | None = None
+    created_at_higher: datetime | None = None
+    
+    sorted_by: ItemAttrSort | None = None
+    sorted_ascending: bool = True
+    
+class ItemSortFilterPublic(ItemSortFilterBase):
     seller_id: int | None = None
     seller_name: str | None = None
     
-class ItemFilterSpecial(ItemFilterBase):
+class ItemSortFilterPrivate(ItemSortFilterBase):
     is_active: bool | None = None
     is_deleted: bool | None = None
     is_banned: bool | None = None 
@@ -93,6 +116,8 @@ if TYPE_CHECKING:
 class Item(ItemBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
     seller_id: Annotated[int | None, Field(foreign_key="user.id")] = None
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     is_active: bool = False
     is_deleted: bool = False

@@ -5,7 +5,7 @@ from ..core.security import get_hashed
 from ..models.users import User, UserInput
 from ..exceptions import *
 
-# ----- User registration ----- #
+# ----- User create ----- #
 
 def check_name_exists(username: str, session: Session):
     check = select(User).where(User.username == username)
@@ -34,7 +34,8 @@ def register_user_service(user: UserInput, session: Session) -> User:
     session.refresh(userDB)
 
     return userDB
-    
+
+# ----- User read ----- #
 
     
         

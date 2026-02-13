@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 # ----- BASE ----- #
 
-class OrderStatus(Enum):
+class OrderStatus(str, Enum):
     PENDING = "PENDING"
     CANCELLED = "CANCELLED"
     SHIPPED = "SHIPPED"
@@ -21,9 +21,9 @@ class OrderBase(SQLModel):
 class OrderInput(OrderBase):
     item_id: int
     
-# ----- OUTPUT ----- #
+# ----- OUTPUT PUBLIC ----- #
     
-# ----- OUTPUT SPECIAL ----- #
+# ----- OUTPUT PRIVATE ----- #
     
 from .items import ItemOutput
 from .users import UserOutput
@@ -43,7 +43,7 @@ class OrderOutput(OrderBase):
     status: OrderStatus
     created_at: datetime
     
-# ----- SEARCH ----- #
+# ----- SORT AND FILTER ----- #
 
 # ----- FILTER ----- #
 
@@ -67,6 +67,10 @@ class Order(OrderBase, table=True):
     item_id: Annotated[int | None, Field(foreign_key="item.id")] = None
     buyer_id: Annotated[int | None, Field(foreign_key="user.id")] = None
     seller_id: Annotated[int | None, Field(foreign_key="user.id")] = None
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    status: OrderStatus
 
     item: Annotated['Item', Relationship(back_populates="orders")] # The item associated with this order
     buyer: Annotated['User', Relationship(back_populates="buy_orders", 
@@ -74,6 +78,5 @@ class Order(OrderBase, table=True):
     seller: Annotated['User', Relationship(back_populates="sell_orders",
                                            sa_relationship_kwargs={"foreign_keys": "Order.seller_id"})] # The seller associated with this order
     
-    status: OrderStatus
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
     

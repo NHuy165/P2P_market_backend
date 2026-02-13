@@ -5,8 +5,8 @@ from sqlmodel import Session
 from ..dependencies import get_current_user
 from ..database import get_session
 from ..models.users import User
-from ..models.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputSpecial, ItemFilterSpecial, ItemFilterPublic
-from ..services.items import create_item_service, edit_item_service, get_personal_items_all_service, get_public_items_all_service, get_personal_item_specific_service, get_public_item_specific_service, delete_item_service
+from ..models.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
+from ..services.items.core import create_item_service, edit_item_service, get_personal_item_many_service, get_public_item_many_service, get_personal_item_one_service, get_public_item_one_service, delete_item_service
 from ..exceptions import *
 
 router = APIRouter()
@@ -16,7 +16,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 # ----- Item listing create ----- #
 
-@router.post("/create", response_model=ItemOutputSpecial)
+@router.post("/create", response_model=ItemOutputPrivate)
 def create_item(user: UserDep, session: SessionDep, item: ItemInput):
     try:
         item_listing = create_item_service(user, session, item)
@@ -31,40 +31,41 @@ def create_item(user: UserDep, session: SessionDep, item: ItemInput):
                 
 # ----- Item listing read ----- #
 
-@router.get("/my-items/", response_model=list[ItemOutputSpecial])
-def get_personal_items_all(user: UserDep, session: SessionDep):
+@router.get("/my-items/", response_model=list[ItemOutputPrivate])
+def get_personal_item_all(user: UserDep, session: SessionDep):
     assert user.id is not None
-    return get_personal_items_all_service(user.id, session)
+    return get_personal_item_many_service(user.id, session)
 
-@router.get("/my-items", response_model=list[ItemOutputSpecial])
-def get_personal_items_all_filtered(user: UserDep, session: SessionDep, filter: Annotated[ItemFilterSpecial, Query()]):
+@router.get("/my-items", response_model=list[ItemOutputPrivate])
+def get_personal_item_with_constraint(user: UserDep, session: SessionDep, filter: Annotated[ItemSortFilterPrivate, Query()]):
     assert user.id is not None
-    return get_personal_items_all_service(user.id, session, filter)
+    return get_personal_item_many_service(user.id, session, filter)
 
-@router.get("/my-items/{item_id}", response_model=ItemOutputSpecial)
-def get_personal_item_specific(user: UserDep, session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
+@router.get("/my-items/{item_id}", response_model=ItemOutputPrivate)
+def get_personal_item_one(user: UserDep, session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
     try:
         assert user.id is not None
-        return get_personal_item_specific_service(user.id, session, item_id)
+        return get_personal_item_one_service(user.id, session, item_id)
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Couldn't find item with specified id",
         )
 
-# These functions don't require user to be logged in
+# These functions below don't require user to be logged in
+
 @router.get("/", response_model=list[ItemOutput])
 def get_public_items_all(session: SessionDep):
-    return get_public_items_all_service(session)
+    return get_public_item_many_service(session)
 
 @router.get("", response_model=list[ItemOutput])
-def get_public_items_all_filtered(session: SessionDep, filter: Annotated[ItemFilterPublic, Query()]):
-    return get_public_items_all_service(session, filter)
+def get_public_items_with_constraint(session: SessionDep, filter: Annotated[ItemSortFilterPublic, Query()]):
+    return get_public_item_many_service(session, filter)
 
 @router.get("/{item_id}", response_model=ItemOutput)
-def get_public_item_specific(session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
+def get_public_item_one(session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
     try:
-        return get_public_item_specific_service(session, item_id)
+        return get_public_item_one_service(session, item_id)
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -85,7 +86,7 @@ def delete_item(user: UserDep, session: SessionDep, item_id: int):
             detail="Couldn't find item with specified id",
         )
         
-@router.patch("/{item_id}", response_model=ItemOutputSpecial)
+@router.patch("/{item_id}", response_model=ItemOutputPrivate)
 def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: ItemUpdate):
     # Checks for obvious error in item_update
     

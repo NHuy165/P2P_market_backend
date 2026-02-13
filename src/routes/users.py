@@ -5,19 +5,19 @@ from sqlmodel import Session
 
 from ..database import get_session
 from ..services.users import *
-from ..models.users import UserInput, UserOutputSpecial
+from ..models.users import UserInput, UserOutputPrivate
 
 router = APIRouter()
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
-# ----- User registration ----- #
+# ----- User create ----- #
 
-@router.post("/register", response_model=UserOutputSpecial)
+@router.post("/register", response_model=UserOutputPrivate)
 def register_user(user: UserInput, session: SessionDep):
     try:
         user_output = register_user_service(user, session)
-        user_output = UserOutputSpecial.model_validate(user_output)
+        user_output = UserOutputPrivate.model_validate(user_output)
         
         return user_output
         
