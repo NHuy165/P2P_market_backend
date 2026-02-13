@@ -5,7 +5,7 @@ from sqlmodel import Session
 from ..dependencies import get_current_user
 from ..database import get_session
 from ..models.users import User
-from ..models.schemas import ItemInput, ItemOutput, ItemUpdate, ItemOutputSpecial, ItemFilterSpecial, ItemFilterPublic
+from ..models.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputSpecial, ItemFilterSpecial, ItemFilterPublic
 from ..services.items import create_item_service, edit_item_service, get_personal_items_all_service, get_public_items_all_service, get_personal_item_specific_service, get_public_item_specific_service, delete_item_service
 from ..exceptions import *
 

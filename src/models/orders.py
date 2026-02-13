@@ -1,7 +1,61 @@
+from pydantic import EmailStr, BaseModel
 from typing import Annotated, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
-from .schemas import OrderBase, OrderStatus
+from enum import Enum
 from datetime import datetime, timezone
+
+# ----- BASE ----- #
+
+class OrderStatus(Enum):
+    PENDING = "PENDING"
+    CANCELLED = "CANCELLED"
+    SHIPPED = "SHIPPED"
+    DELIVERED = "DELIVERED"
+    
+class OrderBase(SQLModel):
+    quantity: Annotated[int, Field(gt=0)]
+    price_per_item: Annotated[float, Field(gt=0)] # Prevents price changes
+    
+# ----- INPUT ----- #
+    
+class OrderInput(OrderBase):
+    item_id: int
+    
+# ----- OUTPUT ----- #
+    
+# ----- OUTPUT SPECIAL ----- #
+    
+from .items import ItemOutput
+from .users import UserOutput
+
+# Orders are only shown to account owner and admins
+class OrderOutput(OrderBase):
+    id: int
+    
+    item_id: int
+    buyer_id: int
+    seller_id: int
+    
+    item: ItemOutput
+    buyer: UserOutput
+    seller: UserOutput
+    
+    status: OrderStatus
+    created_at: datetime
+    
+# ----- SEARCH ----- #
+
+# ----- FILTER ----- #
+
+# ----- UPDATE ----- #
+
+# Buyer, seller and item cannot be changed.
+class OrderUpdate(OrderBase):
+    quantity: Annotated[int | None, Field(gt=0)] = None
+    price_per_item: Annotated[float | None, Field(gt=0)] = None
+    status: OrderStatus | None = None
+    
+# ----- DATABASE ----- #
 
 if TYPE_CHECKING:
     from .items import Item

@@ -2,8 +2,7 @@ from pydantic import EmailStr
 from sqlmodel import Session, select
 
 from ..core.security import get_hashed
-from ..models.schemas import UserInput
-from ..models.users import User
+from ..models.users import User, UserInput
 from ..exceptions import *
 
 # ----- User registration ----- #

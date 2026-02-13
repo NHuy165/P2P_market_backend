@@ -1,8 +1,43 @@
-from sqlmodel import Relationship, Field
+from pydantic import EmailStr, BaseModel
 from typing import Annotated, TYPE_CHECKING
+from sqlmodel import SQLModel, Field, Relationship
+from enum import Enum
 from datetime import datetime, timezone
 
-from .schemas import TransactionBase, TransactionType
+# ----- BASE ----- #
+
+class TransactionType(Enum):
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    SALE = "SALE"
+    PURCHASE = "PURCHASE"
+
+class TransactionBase(SQLModel):
+    amount: Annotated[float, Field(gt=0)]
+    
+# ----- INPUT ----- #
+    
+class TransactionInput(TransactionBase):
+    pass
+    
+# ----- OUTPUT ----- #
+    
+# ----- OUTPUT SPECIAL ----- #
+    
+# Transaction history are only shown to account owner and admins
+class TransactionOutput(TransactionBase):
+    id: int
+    type: TransactionType
+    user_id: int
+    created_at: datetime
+    
+# ----- SEARCH ----- #
+
+# ----- FILTER ----- #
+
+# ----- UPDATE ----- #
+    
+# ----- DATABASE ----- #
 
 if TYPE_CHECKING:
     from .users import User

@@ -2,11 +2,10 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from pydantic import BaseModel, Field
 from typing import Annotated
 from sqlmodel import Session
-from enum import Enum
 
 from ..database import get_session
 from ..services.users import *
-from ..models.schemas import UserInput, UserOutputSpecial
+from ..models.users import UserInput, UserOutputSpecial
 
 router = APIRouter()
 

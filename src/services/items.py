@@ -2,8 +2,7 @@ from sqlmodel import Session, select
 from sqlmodel.sql.expression import SelectOfScalar
 
 from ..models.users import User
-from ..models.items import Item
-from ..models.schemas import ItemInput, ItemUpdate, ItemSearch, ItemFilterBase, ItemFilterPublic, ItemFilterSpecial
+from ..models.items import Item, ItemInput, ItemUpdate, ItemSearch, ItemFilterBase, ItemFilterPublic, ItemFilterSpecial
 from ..exceptions import *
 
 # ----- Utility ----- #

@@ -1,8 +1,7 @@
 from sqlmodel import select, Session
 
 from ..models.users import User
-from ..models.schemas import TransactionType, TransactionInput
-from ..models.transactions import Transaction
+from ..models.transactions import Transaction, TransactionType, TransactionInput
 from ..exceptions import *
 
 # ----- Balance operations ----- #

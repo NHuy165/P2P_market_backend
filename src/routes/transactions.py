@@ -4,8 +4,7 @@ from sqlmodel import Session
 
 from ..services.transactions import *
 from ..database import get_session
-from ..models.schemas import TransactionType, TransactionOutput, TransactionInput
-from ..models.transactions import Transaction
+from ..models.transactions import TransactionType, TransactionOutput, TransactionInput
 from ..models.users import User
 from ..dependencies import get_current_user
 from ..exceptions import *
