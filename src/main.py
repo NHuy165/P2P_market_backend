@@ -20,6 +20,7 @@ app.include_router(
     prefix="/users",
     tags=["users"],
     responses={
+        404: {"description": "User not found."},
         409: {"description": "Registration failed due to overlapping name or email."}
         }    
     )

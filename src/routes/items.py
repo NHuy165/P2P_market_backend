@@ -14,7 +14,7 @@ router = APIRouter()
 UserDep = Annotated[User, Depends(get_current_user)]
 SessionDep = Annotated[Session, Depends(get_session)]
 
-# ----- Item listing create ----- #
+# ----- Item create ----- #
 
 @router.post("/create", response_model=ItemOutputPrivate)
 def create_item(user: UserDep, session: SessionDep, item: ItemInput):
@@ -25,11 +25,10 @@ def create_item(user: UserDep, session: SessionDep, item: ItemInput):
     except ExceptionTakenGeneric:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Another item listing in your account with this name already exists.",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Another item listing in your account with this name already exists."
         )
                 
-# ----- Item listing read ----- #
+# ----- Item read ----- #
 
 @router.get("/my-items/", response_model=list[ItemOutputPrivate])
 def get_personal_item_all(user: UserDep, session: SessionDep):
@@ -72,19 +71,7 @@ def get_public_item_one(session: SessionDep, item_id: Annotated[int, Path(ge=0)]
             detail="Couldn't find item with specified id",
         )
 
-# ----- Item listing update and delete ----- #
-
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_item(user: UserDep, session: SessionDep, item_id: int):
-    try:
-        assert user.id is not None
-        delete_item_service(user.id, session, item_id)
-        
-    except ExceptionNotFound:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Couldn't find item with specified id",
-        )
+# ----- Item update ----- #
         
 @router.patch("/{item_id}", response_model=ItemOutputPrivate)
 def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: ItemUpdate):
@@ -101,8 +88,7 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
     if item_update.stock_quantity is not None and item_update.stock_quantity < 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Item edit caused quantity to be negative.",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Item edit caused quantity to be negative."
         )
     
     # Checks for error from service function
@@ -120,11 +106,22 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
     except ExceptionNegativeValue:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Item edit caused quantity to be negative.",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Item edit caused quantity to be negative."
         )
+        
+# ----- Item delete ----- #
 
-
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_item(user: UserDep, session: SessionDep, item_id: int):
+    try:
+        assert user.id is not None
+        delete_item_service(user.id, session, item_id)
+        
+    except ExceptionNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Couldn't find item with specified id",
+        )
 
 
 

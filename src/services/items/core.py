@@ -6,7 +6,7 @@ from ...models.items import Item, ItemInput, ItemUpdate, ItemSearch, ItemSortFil
 from ...exceptions import *
 from .get import get_item_one, get_item_many
 
-# ----- Item listing create ----- #
+# ----- Item create ----- #
 
 def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
     assert user.id is not None
@@ -25,7 +25,7 @@ def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
     
     return listing
 
-# ----- Item listing read ----- #
+# ----- Item read ----- #
 
 def get_personal_item_many_service(user_id: int, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
     '''
@@ -69,7 +69,7 @@ def get_public_item_one_service(session: Session, item_id: int) -> Item | None:
     
     return result
 
-# ----- Item listing update and delete ----- #
+# ----- Item update ----- #
 
 def edit_item_service(user_id: int, session: Session, item_id: int, item_update: ItemUpdate) -> Item:
     # Cannot edit banned and deleted items (enforced by default by ItemSearch).
@@ -96,6 +96,9 @@ def edit_item_service(user_id: int, session: Session, item_id: int, item_update:
     session.refresh(item)
     
     return item
+
+
+# ----- Item listing update ----- #
 
 def delete_item_service(user_id: int, session: Session, item_id: int):
     # Banned and deleted items count as deleted and cannot be deleted again (enforced by default by ItemSearch).

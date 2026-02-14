@@ -29,8 +29,7 @@ def withdraw(user: UserDep, session: SessionDep, inp: TransactionInput):
     except ExceptionNegativeValue:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Withdrawal amount higher than current balance",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Withdrawal amount higher than current balance"
         )
 
 # ----- Display transactions history ----- #

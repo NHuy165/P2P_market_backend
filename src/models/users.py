@@ -49,7 +49,7 @@ class UserOutputPrivate(UserOutput):
 class UserUpdate(UserBase):
     username: Annotated[str | None, Field(regex=r"^[a-zA-Z0-9_]+$")] = None
     email: EmailStr | None = None
-    password: Annotated[str | None, Field(min_length=8)] = None
+    # password: Annotated[str | None, Field(min_length=8)] = None
     description: str | None = None
     
     is_active: bool | None = None
@@ -58,6 +58,10 @@ class UserUpdate(UserBase):
 class UserUpdateAdmin(UserUpdate):
     is_admin: bool | None = None
     is_banned: bool | None = None
+    
+class PasswordUpdate(BaseModel):
+    old_password: Annotated[str, Field(min_length=1)] # No need to be too strict here, since we verify it anyways
+    new_password: Annotated[str, Field(min_length=8)]
     
 # ----- DATABASE ----- #
 
@@ -79,7 +83,6 @@ class User(UserBase, table=True):
     is_admin: bool = False
     is_banned: bool = False
     is_deleted: bool = False
-    
     
     items: Annotated[list["Item"], Relationship(back_populates="seller")] # Items in stock
     buy_orders: Annotated[list["Order"], Relationship(back_populates="buyer")] # Associated buy orders
