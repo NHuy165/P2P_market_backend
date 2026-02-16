@@ -41,13 +41,17 @@ class TransactionOutput(TransactionBase):
 
 if TYPE_CHECKING:
     from .users import User
+    from .orders import Order
 
 class Transaction(TransactionBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
+    
+    order_id: Annotated[int | None, Field(foreign_key="order.id", unique=True)] = None
+    user_id: Annotated[int | None, Field(foreign_key="user.id")] = None
+    
     type: TransactionType
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
-    user_id: Annotated[int | None, Field(foreign_key="user.id")] = None
-    
     user: Annotated["User", Relationship(back_populates="transactions")]
+    order: Annotated["Order | None", Relationship(back_populates="transaction")] = None
     

@@ -49,7 +49,7 @@ def read_account(user: UserDep, session: SessionDep, user_id: int):
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Couldn't find user with specified id",
+            detail="Couldn't find user",
         )
     
 # ----- User update ----- #

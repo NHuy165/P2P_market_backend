@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 
 from ...core.security import get_hashed, verify_hashed
 from ...models.users import PasswordUpdate, User, UserInput, UserUpdate
-from ...exceptions import *
+from ...exceptions import ExceptionAuth, ExceptionNotFound, ExceptionTakenUserEmail, ExceptionTakenUserName
 
 # ----- User create ----- #
 

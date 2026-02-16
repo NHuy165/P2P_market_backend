@@ -33,22 +33,22 @@ def create_item(user: UserDep, session: SessionDep, item: ItemInput):
 @router.get("/my-items/", response_model=list[ItemOutputPrivate])
 def get_personal_item_all(user: UserDep, session: SessionDep):
     assert user.id is not None
-    return get_personal_item_many_service(user.id, session)
+    return get_personal_item_many_service(user, session)
 
 @router.get("/my-items", response_model=list[ItemOutputPrivate])
 def get_personal_item_with_constraint(user: UserDep, session: SessionDep, filter: Annotated[ItemSortFilterPrivate, Query()]):
     assert user.id is not None
-    return get_personal_item_many_service(user.id, session, filter)
+    return get_personal_item_many_service(user, session, filter)
 
 @router.get("/my-items/{item_id}", response_model=ItemOutputPrivate)
 def get_personal_item_one(user: UserDep, session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
     try:
         assert user.id is not None
-        return get_personal_item_one_service(user.id, session, item_id)
+        return get_personal_item_one_service(user, session, item_id)
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Couldn't find item with specified id",
+            detail="Couldn't find item",
         )
 
 # These functions below don't require user to be logged in
@@ -68,7 +68,7 @@ def get_public_item_one(session: SessionDep, item_id: Annotated[int, Path(ge=0)]
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Couldn't find item with specified id",
+            detail="Couldn't find item",
         )
 
 # ----- Item update ----- #
@@ -81,7 +81,7 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
     if item_update.stock_quantity is not None and item_update.stock_quantity_relative is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot enter both absolute and relative item quantity."
+            detail="Cannot enter both absolute and relative quantity."
         )
         
     # Negative absolute quantity
@@ -94,13 +94,13 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
     # Checks for error from service function
     try:
         assert user.id is not None
-        new_item = edit_item_service(user.id, session, item_id, item_update)
+        new_item = edit_item_service(user, session, item_id, item_update)
         return new_item
         
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Couldn't find item with specified id",
+            detail="Couldn't find item",
         )
         
     except ExceptionNegativeValue:
@@ -115,12 +115,12 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
 def delete_item(user: UserDep, session: SessionDep, item_id: int):
     try:
         assert user.id is not None
-        delete_item_service(user.id, session, item_id)
+        delete_item_service(user, session, item_id)
         
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Couldn't find item with specified id",
+            detail="Couldn't find item",
         )
 
 

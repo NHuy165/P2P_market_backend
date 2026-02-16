@@ -14,7 +14,6 @@ class OrderStatus(str, Enum):
     
 class OrderBase(SQLModel):
     quantity: Annotated[int, Field(gt=0)]
-    price_per_item: Annotated[float, Field(gt=0)] # Prevents price changes
     
 # ----- INPUT ----- #
     
@@ -31,6 +30,8 @@ from .users import UserOutput
 # Orders are only shown to account owner and admins
 class OrderOutput(OrderBase):
     id: int
+    
+    price_per_item = float
     
     item_id: int
     buyer_id: int
@@ -49,17 +50,16 @@ class OrderOutput(OrderBase):
 
 # ----- UPDATE ----- #
 
-# Buyer, seller and item cannot be changed.
 class OrderUpdate(OrderBase):
     quantity: Annotated[int | None, Field(gt=0)] = None
-    price_per_item: Annotated[float | None, Field(gt=0)] = None
-    status: OrderStatus | None = None
+    quantity_relative: int | None = None
     
 # ----- DATABASE ----- #
 
 if TYPE_CHECKING:
     from .items import Item
     from .users import User
+    from .transactions import Transaction
     
 class Order(OrderBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
@@ -69,14 +69,15 @@ class Order(OrderBase, table=True):
     seller_id: Annotated[int | None, Field(foreign_key="user.id")] = None
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    
-    status: OrderStatus
+    price_per_item: Annotated[float, Field(gt=0)] # Prevents price changes
+    status: OrderStatus = OrderStatus.PENDING
 
-    item: Annotated['Item', Relationship(back_populates="orders")] # The item associated with this order
+    item: Annotated['Item', Relationship(back_populates="orders")]
     buyer: Annotated['User', Relationship(back_populates="buy_orders", 
-                                          sa_relationship_kwargs={"foreign_keys": "Order.buyer_id"})] # The buyer associated with this order
+                                          sa_relationship_kwargs={"foreign_keys": "Order.buyer_id"})]
     seller: Annotated['User', Relationship(back_populates="sell_orders",
-                                           sa_relationship_kwargs={"foreign_keys": "Order.seller_id"})] # The seller associated with this order
+                                           sa_relationship_kwargs={"foreign_keys": "Order.seller_id"})]
+    transaction: Annotated['Transaction', Relationship(back_populates="order")]
     
     
     

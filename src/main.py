@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from .routes import auth, users, transactions, items
+from .routes import auth, users, transactions, items, orders
 
 app = FastAPI()
 
@@ -52,5 +52,15 @@ app.include_router(
                       "value": {"detail": "Item quantity update would cause quantity to go negative."}
                   },
               }}
+        }    
+    )
+
+# orders
+app.include_router(
+    orders.router,
+    prefix="/orders",
+    tags=["orders"],
+    responses={
+
         }    
     )

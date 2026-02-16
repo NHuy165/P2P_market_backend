@@ -3,7 +3,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 
 from ...models.users import User
 from ...models.items import Item, ItemInput, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
-from ...exceptions import *
+from ...exceptions import ExceptionNegativeValue, ExceptionNotFound, ExceptionTakenGeneric
 from .get import get_item_one, get_item_many
 
 # ----- Item create ----- #
@@ -27,11 +27,11 @@ def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
 
 # ----- Item read ----- #
 
-def get_personal_item_many_service(user_id: int, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
+def get_personal_item_many_service(user: User, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
     '''
     Gets ALL items, including banned, deleted and inactive.
     '''
-    search = ItemSearch(seller_id=user_id, include_banned=True, include_deleted=True, include_inactive=True)
+    search = ItemSearch(seller_id=user.id, include_banned=True, include_deleted=True, include_inactive=True)
     result = get_item_many(session, search, filter_private=sort_filter)
     
     return result
@@ -45,11 +45,11 @@ def get_public_item_many_service(session: Session, sort_filter: ItemSortFilterPu
     
     return result
 
-def get_personal_item_one_service(user_id: int, session: Session, item_id: int) -> Item | None:
+def get_personal_item_one_service(user: User, session: Session, item_id: int) -> Item | None:
     '''
     Like the "get all" alternative, but only gets one item, based on id.
     '''
-    search = ItemSearch(item_id=item_id, seller_id=user_id, include_banned=True, include_deleted=True, include_inactive=True)
+    search = ItemSearch(item_id=item_id, seller_id=user.id, include_banned=True, include_deleted=True, include_inactive=True)
     result = get_item_one(session, search)
     
     if result is None:
@@ -71,10 +71,10 @@ def get_public_item_one_service(session: Session, item_id: int) -> Item | None:
 
 # ----- Item update ----- #
 
-def edit_item_service(user_id: int, session: Session, item_id: int, item_update: ItemUpdate) -> Item:
+def edit_item_service(user: User, session: Session, item_id: int, item_update: ItemUpdate) -> Item:
     # Cannot edit banned and deleted items (enforced by default by ItemSearch).
-    search = ItemSearch(seller_id=user_id, item_id=item_id, include_inactive=True)
-    item = get_item_one(session, search)
+    search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True)
+    item = get_item_one(session, search, with_for_update=True)
     
     if item is None:
         raise ExceptionNotFound()
@@ -98,12 +98,12 @@ def edit_item_service(user_id: int, session: Session, item_id: int, item_update:
     return item
 
 
-# ----- Item listing update ----- #
+# ----- Item delete ----- #
 
-def delete_item_service(user_id: int, session: Session, item_id: int):
+def delete_item_service(user: User, session: Session, item_id: int):
     # Banned and deleted items count as deleted and cannot be deleted again (enforced by default by ItemSearch).
-    search = ItemSearch(seller_id=user_id, item_id=item_id, include_inactive=True)
-    item = get_item_one(session, search)
+    search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True)
+    item = get_item_one(session, search, with_for_update=True) # with_for_update used because this depends on banned and deleted status
     
     if item is None:
         raise ExceptionNotFound()

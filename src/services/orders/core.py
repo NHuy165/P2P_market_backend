@@ -1,0 +1,144 @@
+from sqlmodel import Session, select
+from datetime import datetime, timezone, timedelta
+
+from ...exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
+from ...models.items import Item
+from ...models.orders import Order, OrderInput, OrderUpdate, OrderStatus
+from ...models.users import User
+from ...models.transactions import Transaction, TransactionType
+
+
+# ----- Order create ----- #
+
+def create_order_service(user: User, session: Session, order_inp: OrderInput) -> Order:
+    user_reserved = session.get(User, user.id, with_for_update=True)
+    if user_reserved is None:
+        raise ExceptionNotFound("User")
+    
+    item = session.get(Item, order_inp.item_id, with_for_update=True)
+    if item is None:
+        raise ExceptionNotFound("Item")
+    
+    if user_reserved.id == item.seller_id:
+        raise ExceptionConflict()
+    
+    if item.stock_quantity < order_inp.quantity:
+        raise ExceptionNegativeValue("Negative stock quantity")
+    
+    total_amount = order_inp.quantity * item.price
+    if total_amount > user_reserved.balance:
+        raise ExceptionNegativeValue("Negative balance")
+    
+    # Subtracting item stock quantity and buyer's balance
+    item.stock_quantity -= order_inp.quantity
+    user_reserved.balance -= order_inp.quantity * item.price
+    # Seller's balance is only updated when order's status is delivered
+    
+    # Creating order
+    order = Order(**order_inp.model_dump())
+    order.price_per_item = item.price
+    
+    order.item = item # This is technically redundant
+    order.seller = item.seller
+    order.buyer = user_reserved
+    
+    # Creating the corresponding transaction (for the buyer)
+    trans = Transaction(amount=total_amount,
+                        type=TransactionType.PURCHASE,
+                        order=order,
+                        user=user_reserved)
+    
+    session.add(trans)
+    session.add(order)
+    session.add(user_reserved)
+    session.add(item)
+    session.commit()
+    session.refresh(order)
+    
+    return order
+    
+# ----- Order read ----- #
+
+# ----- Order update ----- #
+
+def update_order_service(user: User, session: Session, order_id: int, order_upd: OrderUpdate):
+    """
+    Allows users to change their order within 10 minutes of order creation, order is still pending, using new item price.
+    """
+    
+    user_reserved = session.get(User, user.id, with_for_update=True)
+    if user_reserved is None:
+        raise ExceptionNotFound("User")
+    
+    query = select(Order).where(Order.id == order_id, Order.buyer_id == user_reserved.id).with_for_update()
+    order = session.exec(query).first()
+    if order is None:
+        raise ExceptionNotFound("Order")
+    
+    # Order no longer pending
+    if order.status is not OrderStatus.PENDING:
+        raise ExceptionConflict()
+    
+    # Can only edit within 10 minutes of creation.
+    now_time = datetime.now(timezone.utc)
+    if now_time - order.created_at > timedelta(minutes=10):
+        raise ExceptionTimeOut()
+    
+    item = session.get(Item, order.item_id, with_for_update=True)
+    if item is None:
+        raise ExceptionNotFound("Item")
+
+    update_contents = order_upd.model_dump()
+    if order_upd.quantity_relative is not None:
+        update_contents["quantity"] = order.quantity + order_upd.quantity_relative
+    
+    # Edited content results in order quantity less than or equals 0 or higher than stock.
+    if update_contents["quantity"] <= 0 or update_contents["quantity"] > item.stock_quantity + order.quantity:
+        raise ExceptionNegativeValue("Item")
+    
+    # Edited content results in insufficient funds from buyer.
+    if update_contents["quantity"] > order.quantity and user_reserved.balance + (order.price_per_item * order.quantity) - (update_contents["quantity"] * item.price) < 0:
+        raise ExceptionNegativeValue("User")
+    
+    # Actual update logic.
+    money_change = (order.price_per_item * order.quantity) - (update_contents["quantity"] * item.price)
+    # If new order costs more, this number is negative
+    
+    # User update
+    user_reserved.balance += money_change
+    
+    # Transaction update
+    order.transaction.amount -= money_change
+    
+    # Item update
+    item.stock_quantity = item.stock_quantity + order.quantity - update_contents["quantity"]
+    
+    # Item update
+    order.quantity = update_contents["quantity"]
+    order.price_per_item = item.price
+    
+    session.add(user_reserved)
+    session.add(order.transaction)
+    session.add(item)
+    session.add(order)
+    
+    session.commit()
+    session.refresh(order)
+    
+    return order
+    
+    
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
