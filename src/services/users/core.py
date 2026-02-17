@@ -70,10 +70,15 @@ def update_password_service(user: User, session: Session, update_info: PasswordU
     
 # ----- User delete ----- #
     
-def delete_user_service(user: User, session: Session, password) -> None:
+def delete_user_service(user: User, session: Session, password) -> User:
     if not verify_hashed(password, user.hashed_password):
         raise ExceptionAuth()
     
-    session.delete(user)
-    session.commit()
+    user.is_active = False
+    user.is_deleted = True
     
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    return user

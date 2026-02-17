@@ -5,9 +5,9 @@ from sqlmodel import Session
 from ..exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
 from ..database import get_session
 from ..dependencies import get_current_user
-from ..models.orders import OrderInput, OrderOutput, OrderUpdate
+from ..models.orders import OrderInput, OrderOutput, OrderOutputWithType, OrderSortFilter, OrderUpdate
 from ..models.users import User
-from ..services.orders.core import create_order_service, update_order_service
+from ..services.orders.core import create_order_service, delete_order_service, read_orders_services, update_order_service
 
 router = APIRouter()
 
@@ -54,10 +54,20 @@ def create_order(user: User, session: SessionDep, order_inp: OrderInput):
                 detail="Insufficient funds."
             )
             
+# ----- Order read ----- #
+
+@router.get("/", response_model=list[OrderOutputWithType])
+def read_orders_all(user: UserDep, session: SessionDep):
+    return read_orders_services(user, session)
+
+@router.get("", response_model=list[OrderOutputWithType])
+def read_orders_sort_filter(user: UserDep, session: SessionDep, sort_filter: Annotated[OrderSortFilter, Query()]):
+    return read_orders_services(user, session, sort_filter)
+    
 # ----- Order update ----- #
 
-@router.patch("/{order_id}/update", response_model=OrderOutput)
-def update_order(user: UserDep, session: SessionDep, order_id, order_upd: OrderUpdate):
+@router.patch("/{order_id}", response_model=OrderOutput)
+def update_order(user: UserDep, session: SessionDep, order_id: int, order_upd: OrderUpdate):
     if order_upd.quantity is not None and order_upd.quantity_relative is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -108,3 +118,29 @@ def update_order(user: UserDep, session: SessionDep, order_id, order_upd: OrderU
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot edit non-pending items."
         )
+        
+# ----- Order delete ----- #
+
+@router.delete("/{order_id}", response_model=OrderOutput)
+def delete_order(user: UserDep, session: SessionDep, order_id: int):
+    try:
+        order_deleted = delete_order_service(user, session, order_id)
+        return order_deleted
+        
+    except ExceptionNotFound as e:
+        if str(e) == "User":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Couldn't find user."
+            )
+        elif str(e) == "Order":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Couldn't find any pending order with the provided information."
+            )
+            
+            
+            
+        
+        
+        

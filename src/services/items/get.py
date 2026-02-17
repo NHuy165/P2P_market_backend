@@ -3,7 +3,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 
 from ...models.items import Item, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
 from .search import item_search
-from .sort_filter import item_filter_public, item_filter_private
+from .sort_filter import item_sort_filter_public, item_sort_filter_private
 
 def get_item_one(session: Session, search: ItemSearch, with_for_update: bool = False) -> Item | None:
     """
@@ -33,9 +33,9 @@ def get_item_many(session: Session,
     query = select(Item)
     query = item_search(query, search)
     if filter_public is not None:
-        query = item_filter_public(query, filter_public)
+        query = item_sort_filter_public(query, filter_public)
     elif filter_private is not None:
-        query = item_filter_private(query, filter_private)
+        query = item_sort_filter_private(query, filter_private)
         
     if with_for_update:
         query = query.with_for_update()

@@ -14,7 +14,7 @@ router = APIRouter()
 UserDep = Annotated[User, Depends(get_current_user)]
 SessionDep = Annotated[Session, Depends(get_session)]
 
-# ----- Deposit and withdraw (dummy functions) ----- #
+# ----- Transaction create (dummy functions) ----- #
 
 @router.post("/deposit", response_model=TransactionOutput)
 def deposit(user: UserDep, session: SessionDep, inp: TransactionInput):
@@ -31,13 +31,14 @@ def withdraw(user: UserDep, session: SessionDep, inp: TransactionInput):
             status_code=status.HTTP_409_CONFLICT,
             detail="Withdrawal amount higher than current balance"
         )
+        
+# Transactions related to orders are created on orders' side.
 
-# ----- Display transactions history ----- #
+# ----- Transaction read ----- #
 
 @router.get("/history", response_model=list[TransactionOutput])
-def display_history(user: UserDep, session: SessionDep):
-    assert user.id is not None
-    return display_history_service(user.id, session)
+def read_transactions(user: UserDep, session: SessionDep):
+    return read_transactions_service(user, session)
         
         
     

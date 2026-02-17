@@ -74,10 +74,11 @@ def update_password(user: UserDep, session: SessionDep, update_info: UserUpdate)
 
 # ----- User delete ----- #
 
-@router.delete("/delete", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/delete", response_model=UserOutputPrivate)
 def delete_user(user: UserDep, session: SessionDep, password: Annotated[str, Body(min_length=1)]):
     try:
-        delete_user_service(user, session, password)
+        user_deleted = delete_user_service(user, session, password)
+        return user_deleted
         
     except ExceptionAuth:
         raise HTTPException(

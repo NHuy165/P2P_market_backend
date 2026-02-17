@@ -6,7 +6,7 @@ from ..dependencies import get_current_user
 from ..database import get_session
 from ..models.users import User
 from ..models.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
-from ..services.items.core import create_item_service, edit_item_service, get_personal_item_many_service, get_public_item_many_service, get_personal_item_one_service, get_public_item_one_service, delete_item_service
+from ..services.items.core import create_item_service, update_item_service, read_private_items_many_service, read_public_items_many_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
 from ..exceptions import *
 
 router = APIRouter()
@@ -31,20 +31,17 @@ def create_item(user: UserDep, session: SessionDep, item: ItemInput):
 # ----- Item read ----- #
 
 @router.get("/my-items/", response_model=list[ItemOutputPrivate])
-def get_personal_item_all(user: UserDep, session: SessionDep):
-    assert user.id is not None
-    return get_personal_item_many_service(user, session)
+def read_private_items_all(user: UserDep, session: SessionDep):
+    return read_private_items_many_service(user, session)
 
 @router.get("/my-items", response_model=list[ItemOutputPrivate])
-def get_personal_item_with_constraint(user: UserDep, session: SessionDep, filter: Annotated[ItemSortFilterPrivate, Query()]):
-    assert user.id is not None
-    return get_personal_item_many_service(user, session, filter)
+def read_private_items_sort_filter(user: UserDep, session: SessionDep, sort_filter: Annotated[ItemSortFilterPrivate, Query()]):
+    return read_private_items_many_service(user, session, sort_filter)
 
 @router.get("/my-items/{item_id}", response_model=ItemOutputPrivate)
-def get_personal_item_one(user: UserDep, session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
+def read_private_item_one(user: UserDep, session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
     try:
-        assert user.id is not None
-        return get_personal_item_one_service(user, session, item_id)
+        return read_private_item_one_service(user, session, item_id)
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -54,17 +51,17 @@ def get_personal_item_one(user: UserDep, session: SessionDep, item_id: Annotated
 # These functions below don't require user to be logged in
 
 @router.get("/", response_model=list[ItemOutput])
-def get_public_items_all(session: SessionDep):
-    return get_public_item_many_service(session)
+def read_public_items_all(session: SessionDep):
+    return read_public_items_many_service(session)
 
 @router.get("", response_model=list[ItemOutput])
-def get_public_items_with_constraint(session: SessionDep, filter: Annotated[ItemSortFilterPublic, Query()]):
-    return get_public_item_many_service(session, filter)
+def read_public_items_sort_filter(session: SessionDep, sort_filter: Annotated[ItemSortFilterPublic, Query()]):
+    return read_public_items_many_service(session, sort_filter)
 
 @router.get("/{item_id}", response_model=ItemOutput)
-def get_public_item_one(session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
+def read_public_item_one(session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
     try:
-        return get_public_item_one_service(session, item_id)
+        return read_public_item_one_service(session, item_id)
     except ExceptionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -74,7 +71,7 @@ def get_public_item_one(session: SessionDep, item_id: Annotated[int, Path(ge=0)]
 # ----- Item update ----- #
         
 @router.patch("/{item_id}", response_model=ItemOutputPrivate)
-def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: ItemUpdate):
+def update_item(user: UserDep, session: SessionDep, item_id: int, item_update: ItemUpdate):
     # Checks for obvious error in item_update
     
     # Entered both relative and absolute quantity
@@ -94,7 +91,7 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
     # Checks for error from service function
     try:
         assert user.id is not None
-        new_item = edit_item_service(user, session, item_id, item_update)
+        new_item = update_item_service(user, session, item_id, item_update)
         return new_item
         
     except ExceptionNotFound:
@@ -111,11 +108,11 @@ def edit_item(user: UserDep, session: SessionDep, item_id: int, item_update: Ite
         
 # ----- Item delete ----- #
 
-@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{item_id}", response_model=ItemOutputPrivate)
 def delete_item(user: UserDep, session: SessionDep, item_id: int):
     try:
-        assert user.id is not None
-        delete_item_service(user, session, item_id)
+        item_deleted = delete_item_service(user, session, item_id)
+        return item_deleted
         
     except ExceptionNotFound:
         raise HTTPException(

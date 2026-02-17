@@ -1,9 +1,10 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, case, or_, select
 from datetime import datetime, timezone, timedelta
 
+from .sort_filter import order_sort_filter
 from ...exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
 from ...models.items import Item
-from ...models.orders import Order, OrderInput, OrderUpdate, OrderStatus
+from ...models.orders import Order, OrderInput, OrderOutputWithType, OrderSortFilter, OrderUpdate, OrderStatus
 from ...models.users import User
 from ...models.transactions import Transaction, TransactionType
 
@@ -11,6 +12,10 @@ from ...models.transactions import Transaction, TransactionType
 # ----- Order create ----- #
 
 def create_order_service(user: User, session: Session, order_inp: OrderInput) -> Order:
+    """
+    Creates an order and its transaction.
+    Money is subtracted from the buyer and only gets transfered to the buyer on order completion (DELIVERED status).
+    """
     user_reserved = session.get(User, user.id, with_for_update=True)
     if user_reserved is None:
         raise ExceptionNotFound("User")
@@ -59,6 +64,29 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     
 # ----- Order read ----- #
 
+def read_orders_services(user: User, session: Session, sort_filter: OrderSortFilter | None = None) -> list[OrderOutputWithType]:
+    query = select(Order)
+    
+    if sort_filter is not None:
+        query = order_sort_filter(query, sort_filter)
+        
+        # Only get sell orders
+        if sort_filter.sell_buy is True: 
+            query = query.where(Order.seller_id == user.id)
+            result = [OrderOutputWithType.model_validate(ord, update={"order_type": "SELL"}) for ord in session.exec(query).all()]
+            
+        # Only get buy orders
+        elif sort_filter.sell_buy is False:
+            query = query.where(Order.buyer_id == user.id)
+            result = [OrderOutputWithType.model_validate(ord, update={"order_type": "BUY"}) for ord in session.exec(query).all()]
+
+    # Get both types of orders and label accordingly
+    if sort_filter is None or sort_filter.sell_buy is None:
+        query = query.where(or_(Order.seller_id == user.id, Order.buyer_id == user.id))
+        result = [OrderOutputWithType.model_validate(ord, update={"order_type": "SELL" if ord.seller_id == user.id else "BUY"}) for ord in session.exec(query).all()]
+    
+    return result
+
 # ----- Order update ----- #
 
 def update_order_service(user: User, session: Session, order_id: int, order_upd: OrderUpdate):
@@ -100,6 +128,8 @@ def update_order_service(user: User, session: Session, order_id: int, order_upd:
     if update_contents["quantity"] > order.quantity and user_reserved.balance + (order.price_per_item * order.quantity) - (update_contents["quantity"] * item.price) < 0:
         raise ExceptionNegativeValue("User")
     
+    
+    
     # Actual update logic.
     money_change = (order.price_per_item * order.quantity) - (update_contents["quantity"] * item.price)
     # If new order costs more, this number is negative
@@ -126,6 +156,32 @@ def update_order_service(user: User, session: Session, order_id: int, order_upd:
     session.refresh(order)
     
     return order
+    
+# ----- Order delete ----- #
+
+def delete_order_service(user: User, session: Session, order_id: int) -> Order:
+    user_reserved = session.get(User, user.id, with_for_update=True)
+    if user_reserved is None:
+        raise ExceptionNotFound("User")
+    
+    query = select(Order).where(Order.id == order_id, Order.seller_id == user.id, Order.status == OrderStatus.PENDING).with_for_update()
+    order = session.exec(query).first()
+    if order is None:
+        raise ExceptionNotFound("Order")
+    
+    # Delete logic
+    order.transaction.is_cancelled = True
+    order.item.stock_quantity += order.quantity
+    order.buyer.balance += order.price_per_item * order.quantity
+    order.status = OrderStatus.CANCELLED
+    
+    session.add(order)
+    session.commit()
+    session.refresh(order)
+    
+    return order
+    
+    
     
     
     

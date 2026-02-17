@@ -22,24 +22,27 @@ class ItemInput(ItemBase):
     
 # This model is only used by other classes' models to display relationships.
 # The actual item shown to the public is the class below.
-class ItemOutput(ItemBase):
+class ItemOutputNoRelationship(ItemBase):
     id: int
     created_at: datetime
+    seller_id: int
 
 # Item shown to normal users    
 from .users import UserOutput
 
-class ItemOutputWithSeller(ItemOutput):
-    seller_id: int
+class ItemOutput(ItemOutputNoRelationship):
     seller: UserOutput
     
 # ----- OUTPUT PRIVATE ----- #
-    
+
+from .orders import OrderOutput
 # Item shown to account owner and admins
-class ItemOutputPrivate(ItemOutputWithSeller):
+class ItemOutputPrivate(ItemOutput):
     is_active: bool
     is_banned: bool
     is_deleted: bool
+    
+    orders: list[OrderOutput]
     
 # ----- SEARCH ----- #
 
@@ -54,21 +57,29 @@ class ItemSearch(BaseModel):
 
 # ----- SORT AND FILTER ----- #
 
-class ItemAttrSort(str, Enum):
+class ItemAttrSortPrivate(str, Enum):
     item_name = "name"
     item_price = "price"
     item_stock_quantity = "stock_quantity"
     item_id = "id"
-    item_seller_id = "seller_id"
     item_created_at = "created_at"
 
-    # These fields are supposed to only work for private viewing but it doesn't really matter.
     item_is_active = "is_active"
     item_is_deleted = "is_deleted"
     item_is_banned = "is_banned"
     
+class ItemAttrSortPublic(str, Enum):
+    item_name = "name"
+    item_price = "price"
+    item_stock_quantity = "stock_quantity"
+    item_id = "id"
+    item_created_at = "created_at"
+    
+    item_seller_id = "seller_id"
+    
 class ItemSortFilterBase(BaseModel):
     name: str | None = None
+    id: int | None = None
     
     price_lower: float | None = None
     price_upper: float | None = None
@@ -79,14 +90,17 @@ class ItemSortFilterBase(BaseModel):
     created_at_lower: datetime | None = None
     created_at_higher: datetime | None = None
     
-    sorted_by: ItemAttrSort | None = None
     sorted_ascending: bool = True
     
 class ItemSortFilterPublic(ItemSortFilterBase):
+    sorted_by: ItemAttrSortPublic | None = None    
+    
     seller_id: int | None = None
     seller_name: str | None = None
     
 class ItemSortFilterPrivate(ItemSortFilterBase):
+    sorted_by: ItemAttrSortPrivate | None = None
+    
     is_active: bool | None = None
     is_deleted: bool | None = None
     is_banned: bool | None = None 

@@ -33,8 +33,8 @@ def change_money(inp: TransactionInput, user: User, trans_type: TransactionType,
 
 # ----- Display transactions history ----- #
 
-def display_history_service(user_id: int, session: Session) -> list:
-    query = select(Transaction).where(Transaction.user_id == user_id)
+def read_transactions_service(user: User, session: Session) -> list:
+    query = select(Transaction).where(Transaction.user_id == user.id)
     result = session.exec(query).all()
     
     return list(result)

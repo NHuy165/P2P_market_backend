@@ -30,6 +30,7 @@ class TransactionOutput(TransactionBase):
     type: TransactionType
     user_id: int
     created_at: datetime
+    is_cancelled: bool
     
 # ----- SORT AND FILTER ----- #
 
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
 
 class Transaction(TransactionBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
+    
+    is_cancelled: bool = False
     
     order_id: Annotated[int | None, Field(foreign_key="order.id", unique=True)] = None
     user_id: Annotated[int | None, Field(foreign_key="user.id")] = None

@@ -27,7 +27,7 @@ def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
 
 # ----- Item read ----- #
 
-def get_personal_item_many_service(user: User, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
+def read_private_items_many_service(user: User, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
     '''
     Gets ALL items, including banned, deleted and inactive.
     '''
@@ -36,7 +36,7 @@ def get_personal_item_many_service(user: User, session: Session, sort_filter: It
     
     return result
 
-def get_public_item_many_service(session: Session, sort_filter: ItemSortFilterPublic | None = None) -> list[Item]:
+def read_public_items_many_service(session: Session, sort_filter: ItemSortFilterPublic | None = None) -> list[Item]:
     '''
     Public orders will only show non-banned, non-deleted and active functions.
     '''
@@ -45,7 +45,7 @@ def get_public_item_many_service(session: Session, sort_filter: ItemSortFilterPu
     
     return result
 
-def get_personal_item_one_service(user: User, session: Session, item_id: int) -> Item | None:
+def read_private_item_one_service(user: User, session: Session, item_id: int) -> Item | None:
     '''
     Like the "get all" alternative, but only gets one item, based on id.
     '''
@@ -57,7 +57,7 @@ def get_personal_item_one_service(user: User, session: Session, item_id: int) ->
     
     return result
 
-def get_public_item_one_service(session: Session, item_id: int) -> Item | None:
+def read_public_item_one_service(session: Session, item_id: int) -> Item | None:
     '''
     Like the "get all" alternative, but only gets one item, based on id.
     '''
@@ -71,7 +71,7 @@ def get_public_item_one_service(session: Session, item_id: int) -> Item | None:
 
 # ----- Item update ----- #
 
-def edit_item_service(user: User, session: Session, item_id: int, item_update: ItemUpdate) -> Item:
+def update_item_service(user: User, session: Session, item_id: int, item_update: ItemUpdate) -> Item:
     # Cannot edit banned and deleted items (enforced by default by ItemSearch).
     search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True)
     item = get_item_one(session, search, with_for_update=True)
@@ -100,7 +100,7 @@ def edit_item_service(user: User, session: Session, item_id: int, item_update: I
 
 # ----- Item delete ----- #
 
-def delete_item_service(user: User, session: Session, item_id: int):
+def delete_item_service(user: User, session: Session, item_id: int) -> Item:
     # Banned and deleted items count as deleted and cannot be deleted again (enforced by default by ItemSearch).
     search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True)
     item = get_item_one(session, search, with_for_update=True) # with_for_update used because this depends on banned and deleted status
@@ -113,6 +113,7 @@ def delete_item_service(user: User, session: Session, item_id: int):
     
     session.add(item)
     session.commit()
+    session.refresh(item)
     
-    # returns nothing
+    return item
     
