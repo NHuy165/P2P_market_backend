@@ -84,9 +84,9 @@ class User(UserBase, table=True):
     is_banned: bool = False
     is_deleted: bool = False
     
-    items: Annotated[list["Item"], Relationship(back_populates="seller")] # Items in stock
-    buy_orders: Annotated[list["Order"], Relationship(back_populates="buyer")] # Associated buy orders
-    sell_orders: Annotated[list["Order"], Relationship(back_populates="seller")] # Associated sell orders
-    transactions: Annotated[list["Transaction"], Relationship(back_populates="user")] # Associated transactions
+    items: list["Item"] = Relationship(back_populates="seller") # Items in stock
+    buy_orders: list["Order"] = Relationship(back_populates="buyer") # Associated buy orders
+    sell_orders: list["Order"] = Relationship(back_populates="seller") # Associated sell orders
+    transactions: list["Transaction"] = Relationship(back_populates="user") # Associated transactions
 
     

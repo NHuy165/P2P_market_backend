@@ -20,18 +20,9 @@ app.include_router(
     prefix="/users",
     tags=["users"],
     responses={
-        404: {"description": "User not found."},
+        401: {"description": "Incorrect password."},
+        404: {"description": "Couldn't find user."},
         409: {"description": "Registration failed due to overlapping name or email."}
-        }    
-    )
-
-# transactions
-app.include_router(
-    transactions.router,
-    prefix="/wallet",
-    tags=["transactions"],
-    responses={
-        409: {"description": "Negative balance due to purchase or withdrawal."}
         }    
     )
 
@@ -41,17 +32,9 @@ app.include_router(
     prefix="/items",
     tags=["items"],
     responses={
-        400: {"description": "Entered both relative and absolute quantity when updating item."},
-        404: {"description": "Item not found."},
-        409: {"description": "Conflicting values.",
-              "examples": {
-                  "Item name conflict": {
-                      "value": {"detail": "Another one of your items already has this name."}
-                  },
-                  "Negative item quantity": {
-                      "value": {"detail": "Item quantity update would cause quantity to go negative."}
-                  },
-              }}
+        400: {"description": "Entered both relative and absolute quantity."},
+        404: {"description": "Couldn't find item."},
+        409: {"description": "Overlapping name, negative stock or balance."}
         }    
     )
 
@@ -61,6 +44,19 @@ app.include_router(
     prefix="/orders",
     tags=["orders"],
     responses={
+        400: {"description": "Entered both relative and absolute quantity."},
+        404: {"description": "Couldn't find user, item or order with the specified information."},
+        409: {"description": "Buying own items. Negative stock or balance upon ordering. Order update timeout. Order update invalid due to status no longer being pending."}
+        }    
+    )
 
+# transactions
+app.include_router(
+    transactions.router,
+    prefix="/transactions",
+    tags=["transactions"],
+    responses={
+        404: {"description": "User not found."},
+        409: {"description": "Negative balance due to purchase or withdrawal."}
         }    
     )

@@ -35,14 +35,14 @@ class ItemOutput(ItemOutputNoRelationship):
     
 # ----- OUTPUT PRIVATE ----- #
 
-from .orders import OrderOutput
+from .orders import OrderOutputNoType
 # Item shown to account owner and admins
 class ItemOutputPrivate(ItemOutput):
     is_active: bool
     is_banned: bool
     is_deleted: bool
     
-    orders: list[OrderOutput]
+    orders: list[OrderOutputNoType]
     
 # ----- SEARCH ----- #
 
@@ -137,6 +137,6 @@ class Item(ItemBase, table=True):
     is_deleted: bool = False
     is_banned: bool = False
     
-    seller: Annotated['User', Relationship(back_populates='items')] # The user this item belongs to
-    orders: Annotated[list['Order'], Relationship(back_populates='item')] # The orders associated with this item
+    seller: "User" = Relationship(back_populates='items') # The user this item belongs to
+    orders: list["Order"] = Relationship(back_populates='item') # The orders associated with this item
     

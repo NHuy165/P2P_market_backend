@@ -5,7 +5,7 @@ from sqlmodel import Session
 from ..exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
 from ..database import get_session
 from ..dependencies import get_current_user
-from ..models.orders import OrderInput, OrderOutput, OrderOutputWithType, OrderSortFilter, OrderUpdate
+from ..models.orders import OrderInput, OrderOutputNoType, OrderOutput, OrderSortFilter, OrderUpdate
 from ..models.users import User
 from ..services.orders.core import create_order_service, delete_order_service, read_orders_services, update_order_service
 
@@ -16,7 +16,7 @@ SessionDep = Annotated[Session, Depends(get_session)]
 
 # ----- Order create ----- #
 
-router.post("/create", response_model=OrderOutput)
+@router.post("/create", response_model=OrderOutputNoType)
 def create_order(user: User, session: SessionDep, order_inp: OrderInput):
     try:
         assert user.id is not None
@@ -56,17 +56,17 @@ def create_order(user: User, session: SessionDep, order_inp: OrderInput):
             
 # ----- Order read ----- #
 
-@router.get("/", response_model=list[OrderOutputWithType])
+@router.get("/", response_model=list[OrderOutput])
 def read_orders_all(user: UserDep, session: SessionDep):
     return read_orders_services(user, session)
 
-@router.get("", response_model=list[OrderOutputWithType])
+@router.get("", response_model=list[OrderOutput])
 def read_orders_sort_filter(user: UserDep, session: SessionDep, sort_filter: Annotated[OrderSortFilter, Query()]):
     return read_orders_services(user, session, sort_filter)
     
 # ----- Order update ----- #
 
-@router.patch("/{order_id}", response_model=OrderOutput)
+@router.patch("/{order_id}", response_model=OrderOutputNoType)
 def update_order(user: UserDep, session: SessionDep, order_id: int, order_upd: OrderUpdate):
     if order_upd.quantity is not None and order_upd.quantity_relative is not None:
         raise HTTPException(
@@ -121,7 +121,7 @@ def update_order(user: UserDep, session: SessionDep, order_id: int, order_upd: O
         
 # ----- Order delete ----- #
 
-@router.delete("/{order_id}", response_model=OrderOutput)
+@router.delete("/{order_id}", response_model=OrderOutputNoType)
 def delete_order(user: UserDep, session: SessionDep, order_id: int):
     try:
         order_deleted = delete_order_service(user, session, order_id)

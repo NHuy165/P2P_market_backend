@@ -32,7 +32,7 @@ from .users import UserOutput
 class OrderOutputNoRelationship(OrderBase):
     id: int
     
-    price_per_item = float
+    price_per_item: float
     
     item_id: int
     buyer_id: int
@@ -41,14 +41,13 @@ class OrderOutputNoRelationship(OrderBase):
     status: OrderStatus
     created_at: datetime
 
-
-class OrderOutput(OrderOutputNoRelationship):  
+class OrderOutputNoType(OrderOutputNoRelationship):  
     item: ItemOutput
     buyer: UserOutput
     seller: UserOutput
     
-class OrderOutputWithType(OrderOutput):
-    order_type: str
+class OrderOutput(OrderOutputNoType):
+    type: str
     
 # ----- SORT AND FILTER ----- #
 
@@ -63,7 +62,7 @@ class OrderAttrSort(str, Enum):
     order_created_at = "created_at"
     order_price_per_item = "price_per_item"
     order_status = "status"
-    
+    order_type = "type"
 
 class OrderSortFilter(BaseModel):
     id: int | None = None
@@ -82,12 +81,10 @@ class OrderSortFilter(BaseModel):
     price_per_item_lower: float | None = None
     price_per_item_higher: float | None = None
     
-    sell_buy: bool | None = None # True for sell orders only, False for buy orders only, None for both
+    type: bool | None = None # True for sell orders only, False for buy orders only, None for both
     
     sorted_by: OrderAttrSort | None = None
     sorted_ascending: bool = True
-
-# ----- FILTER ----- #
 
 # ----- UPDATE ----- #
 
@@ -105,20 +102,21 @@ if TYPE_CHECKING:
 class Order(OrderBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
     
-    item_id: Annotated[int | None, Field(foreign_key="item.id")] = None
-    buyer_id: Annotated[int | None, Field(foreign_key="user.id")] = None
-    seller_id: Annotated[int | None, Field(foreign_key="user.id")] = None
+    item_id: Annotated[int | None, Field(foreign_key="item.id", nullable=False)] = None
+    buyer_id: Annotated[int | None, Field(foreign_key="user.id", nullable=False)] = None
+    seller_id: Annotated[int | None, Field(foreign_key="user.id", nullable=False)] = None
+    # No transaction foreign key. 
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     price_per_item: Annotated[float, Field(gt=0)] # Prevents price changes
     status: OrderStatus = OrderStatus.PENDING
 
-    item: Annotated['Item', Relationship(back_populates="orders")]
-    buyer: Annotated['User', Relationship(back_populates="buy_orders", 
-                                          sa_relationship_kwargs={"foreign_keys": "Order.buyer_id"})]
-    seller: Annotated['User', Relationship(back_populates="sell_orders",
-                                           sa_relationship_kwargs={"foreign_keys": "Order.seller_id"})]
-    transaction: Annotated['Transaction', Relationship(back_populates="order")]
+    item: "Item" = Relationship(back_populates="orders")
+    buyer: "User" = Relationship(back_populates="buy_orders",
+                                          sa_relationship_kwargs={"foreign_keys": "Order.buyer_id"})
+    seller: "User" = Relationship(back_populates="sell_orders",
+                                           sa_relationship_kwargs={"foreign_keys": "Order.seller_id"})
+    transactions: list["Transaction"] = Relationship(back_populates="order")
     
     
     

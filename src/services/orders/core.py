@@ -4,9 +4,9 @@ from datetime import datetime, timezone, timedelta
 from .sort_filter import order_sort_filter
 from ...exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
 from ...models.items import Item
-from ...models.orders import Order, OrderInput, OrderOutputWithType, OrderSortFilter, OrderUpdate, OrderStatus
+from ...models.orders import Order, OrderInput, OrderOutput, OrderSortFilter, OrderUpdate, OrderStatus
 from ...models.users import User
-from ...models.transactions import Transaction, TransactionType
+from ...models.transactions import Transaction, TransactionType, TransactionStatus
 
 
 # ----- Order create ----- #
@@ -43,17 +43,26 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     order = Order(**order_inp.model_dump())
     order.price_per_item = item.price
     
-    order.item = item # This is technically redundant
+    order.item = item # This is technically redundant.
     order.seller = item.seller
     order.buyer = user_reserved
     
-    # Creating the corresponding transaction (for the buyer)
-    trans = Transaction(amount=total_amount,
+    # Buyer spends money right away.
+    trans_buyer = Transaction(amount=total_amount,
                         type=TransactionType.PURCHASE,
                         order=order,
-                        user=user_reserved)
+                        user=user_reserved,
+                        status=TransactionStatus.SUCCESS)
     
-    session.add(trans)
+    # Seller only gets money when item arrives. That's why it's on hold.
+    trans_seller = Transaction(amount=total_amount,
+                        type=TransactionType.SALE,
+                        order=order,
+                        user=item.seller,
+                        status=TransactionStatus.ON_HOLD)
+    
+    session.add(trans_buyer)
+    session.add(trans_seller)
     session.add(order)
     session.add(user_reserved)
     session.add(item)
@@ -64,26 +73,26 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     
 # ----- Order read ----- #
 
-def read_orders_services(user: User, session: Session, sort_filter: OrderSortFilter | None = None) -> list[OrderOutputWithType]:
+def read_orders_services(user: User, session: Session, sort_filter: OrderSortFilter | None = None) -> list[OrderOutput]:
     query = select(Order)
     
     if sort_filter is not None:
         query = order_sort_filter(query, sort_filter)
         
-        # Only get sell orders
-        if sort_filter.sell_buy is True: 
+        # Only gets sell orders.
+        if sort_filter.type is True: 
             query = query.where(Order.seller_id == user.id)
-            result = [OrderOutputWithType.model_validate(ord, update={"order_type": "SELL"}) for ord in session.exec(query).all()]
+            result = [OrderOutput.model_validate(ord, update={"type": "SELL"}) for ord in session.exec(query).all()]
             
-        # Only get buy orders
-        elif sort_filter.sell_buy is False:
+        # Only gets buy orders.
+        elif sort_filter.type is False:
             query = query.where(Order.buyer_id == user.id)
-            result = [OrderOutputWithType.model_validate(ord, update={"order_type": "BUY"}) for ord in session.exec(query).all()]
+            result = [OrderOutput.model_validate(ord, update={"type": "BUY"}) for ord in session.exec(query).all()]
 
-    # Get both types of orders and label accordingly
-    if sort_filter is None or sort_filter.sell_buy is None:
+    # Gets both types of orders and label accordingly.
+    if sort_filter is None or sort_filter.type is None:
         query = query.where(or_(Order.seller_id == user.id, Order.buyer_id == user.id))
-        result = [OrderOutputWithType.model_validate(ord, update={"order_type": "SELL" if ord.seller_id == user.id else "BUY"}) for ord in session.exec(query).all()]
+        result = [OrderOutput.model_validate(ord, update={"type": "SELL" if ord.seller_id == user.id else "BUY"}) for ord in session.exec(query).all()]
     
     return result
 
@@ -137,18 +146,19 @@ def update_order_service(user: User, session: Session, order_id: int, order_upd:
     # User update
     user_reserved.balance += money_change
     
-    # Transaction update
-    order.transaction.amount -= money_change
+    # Transactions update
+    for trans in order.transactions:
+        trans.amount -= money_change
     
     # Item update
     item.stock_quantity = item.stock_quantity + order.quantity - update_contents["quantity"]
     
-    # Item update
+    # Order update
     order.quantity = update_contents["quantity"]
     order.price_per_item = item.price
     
     session.add(user_reserved)
-    session.add(order.transaction)
+    session.add(order.transactions)
     session.add(item)
     session.add(order)
     
@@ -170,7 +180,8 @@ def delete_order_service(user: User, session: Session, order_id: int) -> Order:
         raise ExceptionNotFound("Order")
     
     # Delete logic
-    order.transaction.is_cancelled = True
+    for trans in order.transactions:
+        trans.status = TransactionStatus.FAILED
     order.item.stock_quantity += order.quantity
     order.buyer.balance += order.price_per_item * order.quantity
     order.status = OrderStatus.CANCELLED

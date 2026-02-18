@@ -1,5 +1,4 @@
 from sqlmodel.sql.expression import SelectOfScalar
-from pydantic import Any
 
 from ...models.orders import Order, OrderSortFilter
 
@@ -39,26 +38,3 @@ def order_sort_filter(query: SelectOfScalar[Order], sort_filter: OrderSortFilter
             query = query.order_by(att.desc())
             
     return query
-    
-    
-'''
-class OrderSortFilter(BaseModel):
-    id: int | None = None
-    item_id: int | None = None
-    buyer_id: int | None = None
-    seller_id: int | None = None
-    
-    status: OrderStatus | None = None
-    
-    quantity_lower: int | None = None
-    quantity_higher: int | None = None
-    
-    created_at_lower: datetime | None = None
-    created_at_higher: datetime | None = None
-    
-    price_per_item_lower: float | None = None
-    price_per_item_higher: float | None = None
-    
-    sorted_by: OrderAttrSort | None = None
-    sorted_ascending: bool = True
-'''
