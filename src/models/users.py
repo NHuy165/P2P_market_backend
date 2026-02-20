@@ -21,6 +21,7 @@ class UserInput(UserBase):
 # User profile shown to normal users
 class UserOutput(UserBase):
     id: int
+    
     created_at: datetime
     
 # ----- OUTPUT PRIVATE ----- #
@@ -30,13 +31,12 @@ from .items import ItemOutput
 # User profile shown to account owner and admins    
 class UserOutputPrivate(UserOutput):
     email: EmailStr
+    balance: float
     
     is_active: bool
     is_admin: bool
     is_banned: bool
     is_deleted: bool
-    
-    balance: float
     
     items: list[ItemOutput]
     
@@ -49,15 +49,11 @@ class UserOutputPrivate(UserOutput):
 class UserUpdate(UserBase):
     username: Annotated[str | None, Field(regex=r"^[a-zA-Z0-9_]+$")] = None
     email: EmailStr | None = None
-    # password: Annotated[str | None, Field(min_length=8)] = None
+    # password: Annotated[str | None, Field(min_length=8)] = None (this is handled by PasswordUpdate)
     description: str | None = None
     
     is_active: bool | None = None
     # is_deleted: bool | None = None (user deletion is done via a separate request)
-    
-class UserUpdateAdmin(UserUpdate):
-    is_admin: bool | None = None
-    is_banned: bool | None = None
     
 class PasswordUpdate(BaseModel):
     old_password: Annotated[str, Field(min_length=1)] # No need to be too strict here, since we verify it anyways
@@ -74,9 +70,10 @@ if TYPE_CHECKING:
 class User(UserBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
     
-    hashed_password: Annotated[str, Field(min_length=8)]
     email: EmailStr
+    hashed_password: Annotated[str, Field(min_length=8)]
     balance: float = 0
+    
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     is_active: bool = True

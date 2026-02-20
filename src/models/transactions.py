@@ -41,44 +41,6 @@ class TransactionOutput(TransactionBase):
     
 # ----- SORT AND FILTER ----- #
 
-"""
-class OrderSortFilter(BaseModel):
-    id: int | None = None
-    item_id: int | None = None
-    buyer_id: int | None = None
-    seller_id: int | None = None
-    
-    status: OrderStatus | None = None
-    
-    quantity_lower: int | None = None
-    quantity_higher: int | None = None
-    
-    created_at_lower: datetime | None = None
-    created_at_higher: datetime | None = None
-    
-    price_per_item_lower: float | None = None
-    price_per_item_higher: float | None = None
-    
-    sell_buy: bool | None = None # True for sell orders only, False for buy orders only, None for both
-    
-    sorted_by: OrderAttrSort | None = None
-    sorted_ascending: bool = True
-    
-class OrderAttrSort(str, Enum):
-    order_id = "id"
-    order_item_id = "item_id"
-    order_buyer_id = "buyer_id"
-    order_seller_id = "seller_id"
-    
-    order_quantity = "quantity"
-    
-    order_created_at = "created_at"
-    order_price_per_item = "price_per_item"
-    order_status = "status"
-    order_type = "type"
-    
-"""
-
 class TransactionAttrSort(str, Enum):
     transaction_id = "id"
     transaction_order_id = "order_id"

@@ -14,3 +14,4 @@ class ExceptionTimeOut(Exception): pass
 
 class ExceptionNotFound(Exception): pass
 
+class ExceptionForbidden(Exception): pass

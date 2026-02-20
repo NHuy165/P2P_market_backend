@@ -24,9 +24,10 @@ class ItemInput(ItemBase):
 # The actual item shown to the public is the class below.
 class ItemOutputNoRelationship(ItemBase):
     id: int
-    created_at: datetime
     seller_id: int
-
+    
+    created_at: datetime
+    
 # Item shown to normal users    
 from .users import UserOutput
 
@@ -47,8 +48,9 @@ class ItemOutputPrivate(ItemOutput):
 # ----- SEARCH ----- #
 
 class ItemSearch(BaseModel):
-    seller_id: int | None = None 
     item_id: int | None = None
+    seller_id: int | None = None 
+    
     item_name: str | None = None
     
     include_banned: bool = False
@@ -58,10 +60,11 @@ class ItemSearch(BaseModel):
 # ----- SORT AND FILTER ----- #
 
 class ItemAttrSortPrivate(str, Enum):
+    item_id = "id"
+    
     item_name = "name"
     item_price = "price"
     item_stock_quantity = "stock_quantity"
-    item_id = "id"
     item_created_at = "created_at"
 
     item_is_active = "is_active"
@@ -69,17 +72,19 @@ class ItemAttrSortPrivate(str, Enum):
     item_is_banned = "is_banned"
     
 class ItemAttrSortPublic(str, Enum):
+    item_id = "id"
+    
     item_name = "name"
     item_price = "price"
     item_stock_quantity = "stock_quantity"
-    item_id = "id"
     item_created_at = "created_at"
     
     item_seller_id = "seller_id"
     
 class ItemSortFilterBase(BaseModel):
-    name: str | None = None
     id: int | None = None
+    
+    name: str | None = None
     
     price_lower: float | None = None
     price_upper: float | None = None

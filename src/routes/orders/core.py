@@ -1,23 +1,18 @@
 from fastapi import APIRouter, Depends, status, HTTPException, Path, Query
 from typing import Annotated
-from sqlmodel import Session
 
-from ..exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
-from ..database import get_session
-from ..dependencies import get_current_user
-from ..models.orders import OrderInput, OrderOutputNoType, OrderOutput, OrderSortFilter, OrderUpdate
-from ..models.users import User
-from ..services.orders.core import create_order_service, delete_order_service, read_orders_services, update_order_service
+from ...database import SessionDep
+from ..auth.core import UserDep
+from ...exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
+from ...models.orders import OrderInput, OrderOutputNoType, OrderOutput, OrderSortFilter, OrderUpdate
+from ...services.orders.core import create_order_service, delete_order_service, read_orders_services, update_order_service
 
 router = APIRouter()
-
-UserDep = Annotated[User, Depends(get_current_user)]
-SessionDep = Annotated[Session, Depends(get_session)]
 
 # ----- Order create ----- #
 
 @router.post("/create", response_model=OrderOutputNoType)
-def create_order(user: User, session: SessionDep, order_inp: OrderInput):
+def create_order(user: UserDep, session: SessionDep, order_inp: OrderInput):
     try:
         assert user.id is not None
         order_out = create_order_service(user, session, order_inp)

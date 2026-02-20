@@ -23,8 +23,6 @@ def item_sort_filter_base(query: SelectOfScalar[Item], sort_filter: ItemSortFilt
     if sort_filter.created_at_higher is not None:
         query = query.where(Item.created_at <= sort_filter.created_at_higher)
         
-    
-        
     return query
 
 def item_sort_filter_public(query: SelectOfScalar[Item], sort_filter: ItemSortFilterPublic) -> SelectOfScalar[Item]:

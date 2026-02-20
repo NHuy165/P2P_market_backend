@@ -1,18 +1,12 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-from typing import Annotated
-from sqlmodel import Session
+from fastapi import APIRouter, status, HTTPException
 
-from ..services.transactions.core import *
-from ..database import get_session
-from ..models.transactions import TransactionType, TransactionOutput, TransactionInput
-from ..models.users import User
-from ..dependencies import get_current_user
-from ..exceptions import *
+from ...database import SessionDep
+from ..auth.core import UserDep
+from ...services.transactions.core import change_money, read_transactions_service  
+from ...models.transactions import TransactionSortFilter, TransactionType, TransactionOutput, TransactionInput
+from ...exceptions import ExceptionNegativeValue, ExceptionNotFound  
 
 router = APIRouter()
-
-UserDep = Annotated[User, Depends(get_current_user)]
-SessionDep = Annotated[Session, Depends(get_session)]
 
 # ----- Transaction create (dummy functions) ----- #
 

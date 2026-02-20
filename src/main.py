@@ -1,62 +1,96 @@
-from fastapi import FastAPI
+from fastapi import APIRouter, Depends, FastAPI
+from typing import Any
 
-from .routes import auth, users, transactions, items, orders
+from .routes.auth.core import verify_admin
+from .routes import auth, items, orders, transactions, users
+from .database import create_db_and_tables
 
-app = FastAPI()
+app = FastAPI(
+    responses={
+        409: {"description": "Invalid login credentials."}
+    }
+)
 
-# auth
+
+admin_router = APIRouter()
+
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+    
+
+
+# ----- Auth ----- #
+
 app.include_router(
-    auth.router,
+    auth.core.router,
     prefix="",
     tags=["auth"],
-    responses={
-        409: {"description": "Invalid login credentials."},
-        }    
     )
 
-# users
+# ----- Users ----- #
+
 app.include_router(
-    users.router,
+    users.core.router,
     prefix="/users",
     tags=["users"],
-    responses={
-        401: {"description": "Incorrect password."},
-        404: {"description": "Couldn't find user."},
-        409: {"description": "Registration failed due to overlapping name or email."}
-        }    
     )
 
-# items
+admin_router.include_router(
+    users.admin.router,
+    prefix="/users",
+    tags=["users"],
+)
+
+# ----- Items ----- #
+
+items_errors : dict[int | str, dict[str, Any]] | None = {
+    400: {"description": "Entered both relative and absolute quantity."},
+    404: {"description": "Couldn't find item."},
+    409: {"description": "Overlapping name, negative stock or balance."}
+    }    
+
 app.include_router(
-    items.router,
+    items.core.router,
     prefix="/items",
     tags=["items"],
-    responses={
-        400: {"description": "Entered both relative and absolute quantity."},
-        404: {"description": "Couldn't find item."},
-        409: {"description": "Overlapping name, negative stock or balance."}
-        }    
+    responses=items_errors
     )
 
-# orders
+# ----- Orders ----- #
+orders_errors : dict[int | str, dict[str, Any]] | None = {
+    400: {"description": "Entered both relative and absolute quantity."},
+    404: {"description": "Couldn't find user, item or order with the specified information."},
+    409: {"description": "Buying own items. Negative stock or balance upon ordering. Order update timeout. Order update invalid due to status no longer being pending."}
+    }     
 app.include_router(
-    orders.router,
+    orders.core.router,
     prefix="/orders",
     tags=["orders"],
-    responses={
-        400: {"description": "Entered both relative and absolute quantity."},
-        404: {"description": "Couldn't find user, item or order with the specified information."},
-        409: {"description": "Buying own items. Negative stock or balance upon ordering. Order update timeout. Order update invalid due to status no longer being pending."}
-        }    
+    responses=orders_errors
     )
 
-# transactions
+# ----- Transactions ----- #
+transactions_errors : dict[int | str, dict[str, Any]] | None = {
+    404: {"description": "User not found."},
+    409: {"description": "Negative balance due to purchase or withdrawal."}
+    }    
+
 app.include_router(
-    transactions.router,
+    transactions.core.router,
     prefix="/transactions",
     tags=["transactions"],
+    responses=transactions_errors
+    )
+
+# ----- Admin ----- #
+
+app.include_router(
+    admin_router,
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(verify_admin)],
     responses={
-        404: {"description": "User not found."},
-        409: {"description": "Negative balance due to purchase or withdrawal."}
-        }    
+        403: {"description": "User does not have admin privileges."}
+    }
     )

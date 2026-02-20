@@ -3,6 +3,9 @@ from sqlmodel.sql.expression import SelectOfScalar
 from ...models.items import Item, ItemSearch
 
 def item_search(query: SelectOfScalar[Item], search: ItemSearch) -> SelectOfScalar[Item]:
+    """
+    This function is dumb, it only makes a query, it doesn't know whether we're searching for one or multiple
+    """
     if search.seller_id is not None:
         query = query.where(Item.seller_id == search.seller_id)
     if search.item_id is not None:

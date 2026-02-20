@@ -1,9 +1,12 @@
 from pydantic import EmailStr
 from sqlmodel import Session, select
 
+from src.services.items.core import delete_items_all_service
+
+from ...models.orders import Order, OrderStatus
 from ...core.security import get_hashed, verify_hashed
 from ...models.users import PasswordUpdate, User, UserInput, UserUpdate
-from ...exceptions import ExceptionAuth, ExceptionNotFound, ExceptionTakenUserEmail, ExceptionTakenUserName
+from ...exceptions import ExceptionAuth, ExceptionConflict, ExceptionForbidden, ExceptionNotFound, ExceptionTakenUserEmail, ExceptionTakenUserName
 
 # ----- User create ----- #
 
@@ -68,11 +71,42 @@ def update_password_service(user: User, session: Session, update_info: PasswordU
     
     # returns nothing
     
+def change_active_status_service(session: Session, user_id: int, activate: bool) -> User:
+    user = session.get(User, user_id)
+    
+    if user is None:
+        raise ExceptionNotFound()
+    
+    if user.is_admin:
+        raise ExceptionForbidden()
+    
+    if (user.is_active is True and activate is True) or (user.is_active is False and activate is False):
+        raise ExceptionConflict()
+    
+    if activate:
+        user.is_active = True
+    else:
+        user.is_active = False
+    
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    return user
+    
 # ----- User delete ----- #
     
-def delete_user_service(user: User, session: Session, password) -> User:
+def delete_user_service(user: User, session: Session, password: str) -> User:
     if not verify_hashed(password, user.hashed_password):
         raise ExceptionAuth()
+    
+    query = select(Order).where(Order.seller_id == user.id, Order.status == OrderStatus.PENDING)
+    result = session.exec(query).first()
+    
+    if result is not None:
+        raise ExceptionConflict()
+    
+    delete_items_all_service(user, session)
     
     user.is_active = False
     user.is_deleted = True
@@ -82,3 +116,28 @@ def delete_user_service(user: User, session: Session, password) -> User:
     session.refresh(user)
     
     return user
+
+def change_ban_status_service(session: Session, user_id: int, ban: bool) -> User:
+    user = session.get(User, user_id)
+    
+    if user is None:
+        raise ExceptionNotFound()
+    
+    if user.is_admin:
+        raise ExceptionForbidden()
+    
+    if (user.is_banned is True and ban is True) or (user.is_banned is False and ban is False):
+        raise ExceptionConflict()
+    
+    user.is_active = False
+    user.is_banned = True
+    
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    return user
+    
+    
+    
+    

@@ -1,18 +1,13 @@
-from fastapi import APIRouter, Depends, status, HTTPException, Path, Query
+from fastapi import APIRouter, status, HTTPException, Path, Query
 from typing import Annotated
-from sqlmodel import Session
 
-from ..dependencies import get_current_user
-from ..database import get_session
-from ..models.users import User
-from ..models.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
-from ..services.items.core import create_item_service, update_item_service, read_private_items_many_service, read_public_items_many_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
-from ..exceptions import *
+from ..auth.core import UserDep
+from ...database import SessionDep
+from ...models.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
+from ...services.items.core import create_item_service, delete_items_all_service, restore_item_service, update_item_service, read_private_items_many_service, read_public_items_many_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
+from ...exceptions import *
 
 router = APIRouter()
-
-UserDep = Annotated[User, Depends(get_current_user)]
-SessionDep = Annotated[Session, Depends(get_session)]
 
 # ----- Item create ----- #
 
@@ -110,9 +105,32 @@ def update_item(user: UserDep, session: SessionDep, item_id: int, item_update: I
 
 @router.delete("/{item_id}", response_model=ItemOutputPrivate)
 def delete_item(user: UserDep, session: SessionDep, item_id: int):
+    """
+    Soft delete, preventing the item from getting ordered. Its owner can still restore it.
+    """
     try:
         item_deleted = delete_item_service(user, session, item_id)
         return item_deleted
+        
+    except ExceptionNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Couldn't find item",
+        )
+
+@router.delete("/", response_model=list[ItemOutputPrivate])
+def delete_items_all(user: UserDep, session: SessionDep):
+    """
+    Mainly used when users are about to delete their account. So their items do not get ordered anymore.
+    """
+    items_deleted = delete_items_all_service(user, session)
+    return items_deleted
+        
+@router.post("/{item_id}", response_model=ItemOutputPrivate)
+def restore_item(user: UserDep, session: SessionDep, item_id: int):
+    try:
+        item_restored = restore_item_service(user, session, item_id)
+        return item_restored
         
     except ExceptionNotFound:
         raise HTTPException(

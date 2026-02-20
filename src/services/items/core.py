@@ -1,10 +1,10 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, update
 from sqlmodel.sql.expression import SelectOfScalar
 
 from ...models.users import User
 from ...models.items import Item, ItemInput, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
 from ...exceptions import ExceptionNegativeValue, ExceptionNotFound, ExceptionTakenGeneric
-from .get import get_item_one, get_item_many
+from .get import get_item_one, get_items_many
 
 # ----- Item create ----- #
 
@@ -32,7 +32,7 @@ def read_private_items_many_service(user: User, session: Session, sort_filter: I
     Gets ALL items, including banned, deleted and inactive.
     '''
     search = ItemSearch(seller_id=user.id, include_banned=True, include_deleted=True, include_inactive=True)
-    result = get_item_many(session, search, filter_private=sort_filter)
+    result = get_items_many(session, search, filter_private=sort_filter)
     
     return result
 
@@ -41,7 +41,7 @@ def read_public_items_many_service(session: Session, sort_filter: ItemSortFilter
     Public orders will only show non-banned, non-deleted and active functions.
     '''
     search = ItemSearch()
-    result = get_item_many(session, search, filter_public=sort_filter)
+    result = get_items_many(session, search, filter_public=sort_filter)
     
     return result
 
@@ -103,11 +103,12 @@ def update_item_service(user: User, session: Session, item_id: int, item_update:
 def delete_item_service(user: User, session: Session, item_id: int) -> Item:
     # Banned and deleted items count as deleted and cannot be deleted again (enforced by default by ItemSearch).
     search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True)
-    item = get_item_one(session, search, with_for_update=True) # with_for_update used because this depends on banned and deleted status
+    item = get_item_one(session, search, with_for_update=True) # with_for_update used because this depends on banned and deleted status.
     
     if item is None:
         raise ExceptionNotFound()
     
+    # Soft delete so pending orders still have to get delivered.
     item.is_active = False
     item.is_deleted = True
     
@@ -117,3 +118,34 @@ def delete_item_service(user: User, session: Session, item_id: int) -> Item:
     
     return item
     
+# Used for when you want to delete your account
+def delete_items_all_service(user: User, session: Session) -> list[Item]:
+    search = ItemSearch(seller_id=user.id, include_inactive=True)
+    items = get_items_many(session, search, with_for_update=True) # with_for_update for reasons similar to above
+    
+    for item in items:
+        item.is_active = False
+        item.is_deleted = True
+        
+    session.add_all(items)
+    session.commit()
+    
+    for item in items:
+        session.refresh(item)
+    
+    return items
+    
+def restore_item_service(user: User, session: Session, item_id: int) -> Item:
+    search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True, include_deleted=True) 
+    item = get_item_one(session, search, with_for_update=True) # with_for_update just in case, but is probably unnecessary.
+    
+    if item is None:
+        raise ExceptionNotFound()
+    
+    item.is_deleted = False
+    
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    
+    return item

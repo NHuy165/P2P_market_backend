@@ -19,7 +19,7 @@ def get_item_one(session: Session, search: ItemSearch, with_for_update: bool = F
     
     return session.exec(query).first()
         
-def get_item_many(session: Session, 
+def get_items_many(session: Session, 
                   search: ItemSearch,
                   filter_public: ItemSortFilterPublic | None = None,
                   filter_private: ItemSortFilterPrivate | None = None,

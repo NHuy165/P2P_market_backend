@@ -174,7 +174,8 @@ def delete_order_service(user: User, session: Session, order_id: int) -> Order:
     if user_reserved is None:
         raise ExceptionNotFound("User")
     
-    query = select(Order).where(Order.id == order_id, Order.seller_id == user.id, Order.status == OrderStatus.PENDING).with_for_update()
+    # Both seller and buyer can cancel the order
+    query = select(Order).where(Order.id == order_id, or_(Order.buyer_id == user.id, Order.seller_id == user.id), Order.status == OrderStatus.PENDING).with_for_update()
     order = session.exec(query).first()
     if order is None:
         raise ExceptionNotFound("Order")
