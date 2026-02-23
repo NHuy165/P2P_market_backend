@@ -1,12 +1,12 @@
 from sqlmodel import Session, case, or_, select
 from datetime import datetime, timezone, timedelta
 
+from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionItemNotFound_404, ExceptionNotPending_409, ExceptionOrderNotFound_404, ExceptionSelfOwned_409, ExceptionTimeout_409, ExceptionUserNotFound_404
 from .sort_filter import order_sort_filter
-from ...exceptions import ExceptionConflict, ExceptionNegativeValue, ExceptionNotFound, ExceptionTimeOut
-from ...models.items import Item
-from ...models.orders import Order, OrderInput, OrderOutput, OrderSortFilter, OrderUpdate, OrderStatus
-from ...models.users import User
-from ...models.transactions import Transaction, TransactionType, TransactionStatus
+from ...models_schemas.items import Item
+from ...models_schemas.orders import Order, OrderInput, OrderOutput, OrderSortFilter, OrderUpdate, OrderStatus
+from ...models_schemas.users import User
+from ...models_schemas.transactions import Transaction, TransactionType, TransactionStatus
 
 
 # ----- Order create ----- #
@@ -18,21 +18,22 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     """
     user_reserved = session.get(User, user.id, with_for_update=True)
     if user_reserved is None:
-        raise ExceptionNotFound("User")
+        assert user.id is not None
+        raise ExceptionUserNotFound_404(user.id)
     
     item = session.get(Item, order_inp.item_id, with_for_update=True)
     if item is None:
-        raise ExceptionNotFound("Item")
+        raise ExceptionItemNotFound_404(order_inp.item_id)
     
     if user_reserved.id == item.seller_id:
-        raise ExceptionConflict()
+        raise ExceptionSelfOwned_409("Buying item")
     
     if item.stock_quantity < order_inp.quantity:
-        raise ExceptionNegativeValue("Negative stock quantity")
+        raise ExceptionInvalidValue_409("Item stock quantity", item.stock_quantity - order_inp.quantity)
     
     total_amount = order_inp.quantity * item.price
     if total_amount > user_reserved.balance:
-        raise ExceptionNegativeValue("Negative balance")
+        raise ExceptionInvalidValue_409("Account balance", user_reserved.balance - total_amount)
     
     # Subtracting item stock quantity and buyer's balance
     item.stock_quantity -= order_inp.quantity
@@ -105,39 +106,46 @@ def update_order_service(user: User, session: Session, order_id: int, order_upd:
     
     user_reserved = session.get(User, user.id, with_for_update=True)
     if user_reserved is None:
-        raise ExceptionNotFound("User")
+        assert user.id is not None
+        raise ExceptionUserNotFound_404(user.id)
     
     query = select(Order).where(Order.id == order_id, Order.buyer_id == user_reserved.id).with_for_update()
     order = session.exec(query).first()
     if order is None:
-        raise ExceptionNotFound("Order")
+        raise ExceptionOrderNotFound_404(order_id)
     
     # Order no longer pending
     if order.status is not OrderStatus.PENDING:
-        raise ExceptionConflict()
+        raise ExceptionNotPending_409()
     
     # Can only edit within 10 minutes of creation.
     now_time = datetime.now(timezone.utc)
     if now_time - order.created_at > timedelta(minutes=10):
-        raise ExceptionTimeOut()
+        raise ExceptionTimeout_409("10 minutes")
     
     item = session.get(Item, order.item_id, with_for_update=True)
     if item is None:
-        raise ExceptionNotFound("Item")
+        assert order.item_id is not None
+        raise ExceptionItemNotFound_404(order.item_id)
 
     update_contents = order_upd.model_dump()
     if order_upd.quantity_relative is not None:
         update_contents["quantity"] = order.quantity + order_upd.quantity_relative
     
-    # Edited content results in order quantity less than or equals 0 or higher than stock.
-    if update_contents["quantity"] <= 0 or update_contents["quantity"] > item.stock_quantity + order.quantity:
-        raise ExceptionNegativeValue("Item")
+    # Edited content results in order quantity being fewer than 0 or higher than stock.
+    if update_contents["quantity"] <= 0: 
+        raise ExceptionInvalidValue_409("Ordered item quantity", update_contents["quantity"])
+    if update_contents["quantity"] > item.stock_quantity + order.quantity:
+        raise ExceptionInvalidValue_409("Item stock quantity", item.stock_quantity + order.quantity - update_contents["quantity"])
     
     # Edited content results in insufficient funds from buyer.
-    if update_contents["quantity"] > order.quantity and user_reserved.balance + (order.price_per_item * order.quantity) - (update_contents["quantity"] * item.price) < 0:
-        raise ExceptionNegativeValue("User")
+    old_balance = user_reserved.balance
+    refund = order.price_per_item * order.quantity
+    new_cost = update_contents["quantity"] * item.price
+    new_balance = old_balance + refund - new_cost
     
-    
+    if update_contents["quantity"] > order.quantity and new_balance < 0:
+        raise ExceptionInvalidValue_409("Account balance", new_balance)
     
     # Actual update logic.
     money_change = (order.price_per_item * order.quantity) - (update_contents["quantity"] * item.price)
@@ -172,13 +180,14 @@ def update_order_service(user: User, session: Session, order_id: int, order_upd:
 def delete_order_service(user: User, session: Session, order_id: int) -> Order:
     user_reserved = session.get(User, user.id, with_for_update=True)
     if user_reserved is None:
-        raise ExceptionNotFound("User")
+        assert user.id is not None
+        raise ExceptionUserNotFound_404(user.id)
     
     # Both seller and buyer can cancel the order
     query = select(Order).where(Order.id == order_id, or_(Order.buyer_id == user.id, Order.seller_id == user.id), Order.status == OrderStatus.PENDING).with_for_update()
     order = session.exec(query).first()
     if order is None:
-        raise ExceptionNotFound("Order")
+        raise ExceptionOrderNotFound_404(order_id)
     
     # Delete logic
     for trans in order.transactions:

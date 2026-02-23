@@ -1,6 +1,6 @@
 from sqlmodel.sql.expression import SelectOfScalar
 
-from ...models.items import Item, ItemSearch
+from ...models_schemas.items import Item, ItemSearch
 
 def item_search(query: SelectOfScalar[Item], search: ItemSearch) -> SelectOfScalar[Item]:
     """

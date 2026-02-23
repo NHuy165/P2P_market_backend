@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 from sqlmodel.sql.expression import SelectOfScalar
 
-from ...models.items import Item, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
+from ...models_schemas.items import Item, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
 from .search import item_search
 from .sort_filter import item_sort_filter_public, item_sort_filter_private
 

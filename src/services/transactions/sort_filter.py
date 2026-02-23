@@ -1,6 +1,6 @@
 from sqlmodel.sql.expression import SelectOfScalar
 
-from ...models.transactions import Transaction, TransactionSortFilter
+from ...models_schemas.transactions import Transaction, TransactionSortFilter
 
 def transaction_sort_filter(query: SelectOfScalar[Transaction], sort_filter: TransactionSortFilter) -> SelectOfScalar[Transaction]:
     if sort_filter.id is not None:

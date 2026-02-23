@@ -1,9 +1,9 @@
 from sqlmodel import select, Session
 
+from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionUserNotFound_404
 from .sort_filter import transaction_sort_filter
-from ...models.users import User
-from ...models.transactions import Transaction, TransactionSortFilter, TransactionStatus, TransactionType, TransactionInput
-from ...exceptions import ExceptionNegativeValue,  ExceptionNotFound
+from ...models_schemas.users import User
+from ...models_schemas.transactions import Transaction, TransactionSortFilter, TransactionStatus, TransactionType, TransactionInput
 
 # ----- Transaction create ----- #
 
@@ -14,11 +14,12 @@ def change_money(user: User, session: Session, inp: TransactionInput, trans_type
     """
     user_reserved = session.get(User, user.id, with_for_update=True)
     if user_reserved is None:
-        raise ExceptionNotFound()
+        assert user.id is not None
+        raise ExceptionUserNotFound_404(user.id)
     
     if trans_type.value is TransactionType.WITHDRAWAL:
         if user_reserved.balance < inp.amount:
-            raise ExceptionNegativeValue()
+            raise ExceptionInvalidValue_409("Account balance", user_reserved.balance - inp.amount)
         user_reserved.balance -= inp.amount
         
     else:

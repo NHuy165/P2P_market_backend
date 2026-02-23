@@ -1,6 +1,6 @@
 from sqlmodel.sql.expression import SelectOfScalar
 
-from ...models.items import Item, ItemSortFilterBase, ItemSortFilterPrivate, ItemSortFilterPublic
+from ...models_schemas.items import Item, ItemSortFilterBase, ItemSortFilterPrivate, ItemSortFilterPublic
 
 def item_sort_filter_base(query: SelectOfScalar[Item], sort_filter: ItemSortFilterBase) -> SelectOfScalar[Item]:
     if sort_filter.name is not None:

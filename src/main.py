@@ -1,18 +1,26 @@
 from fastapi import APIRouter, Depends, FastAPI
 from typing import Any
 
-from .routes.auth.core import verify_admin
+from .models_schemas.exceptions import ExceptionCustom, Responses
+from .core.dependencies import verify_admin
 from .routes import auth, items, orders, transactions, users
-from .database import create_db_and_tables
+from .core.database import create_db_and_tables
+from .core.exceptions_handling import custom_exceptions_handler
 
-app = FastAPI(
+# Main app
+# Can't add generic error responses here since some functions do not need users to log in.
+app = FastAPI()
+
+# For adding admin routers, and these all use the verify_admin dependency.
+admin_router = APIRouter(
+    dependencies=[Depends(verify_admin)],
     responses={
-        409: {"description": "Invalid login credentials."}
+        401: Responses.RESPONSE_401_UNAUTHORIZED,
+        403: Responses.RESPONSE_403_FORBIDDEN,
     }
 )
 
-
-admin_router = APIRouter()
+app.add_exception_handler(ExceptionCustom, custom_exceptions_handler) # type: ignore
 
 @app.on_event("startup")
 def on_startup():
@@ -89,8 +97,4 @@ app.include_router(
     admin_router,
     prefix="/admin",
     tags=["admin"],
-    dependencies=[Depends(verify_admin)],
-    responses={
-        403: {"description": "User does not have admin privileges."}
-    }
     )

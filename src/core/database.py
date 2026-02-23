@@ -2,7 +2,7 @@ from typing import Annotated
 from fastapi import Depends
 from sqlmodel import create_engine, SQLModel, Session
 
-from .core.security import settings
+from .security import settings
 
 engine = create_engine(str(settings.POSTGRES_URL), echo=True)
 

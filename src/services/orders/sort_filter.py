@@ -1,6 +1,6 @@
 from sqlmodel.sql.expression import SelectOfScalar
 
-from ...models.orders import Order, OrderSortFilter
+from ...models_schemas.orders import Order, OrderSortFilter
 
 def order_sort_filter(query: SelectOfScalar[Order], sort_filter: OrderSortFilter) -> SelectOfScalar[Order]:
     if sort_filter.id is not None:

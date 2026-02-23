@@ -1,9 +1,8 @@
-from sqlmodel import Session, select, update
-from sqlmodel.sql.expression import SelectOfScalar
+from sqlmodel import Session
 
-from ...models.users import User
-from ...models.items import Item, ItemInput, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
-from ...exceptions import ExceptionNegativeValue, ExceptionNotFound, ExceptionTakenGeneric
+from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionItemNotFound_404, ExceptionTakenItemName_409
+from ...models_schemas.users import User
+from ...models_schemas.items import Item, ItemInput, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
 from .get import get_item_one, get_items_many
 
 # ----- Item create ----- #
@@ -15,7 +14,7 @@ def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
     existing = get_item_one(session, search)
     
     if existing is not None:
-        raise ExceptionTakenGeneric()
+        raise ExceptionTakenItemName_409()
     
     listing = Item(**item.model_dump(), seller=user)
     
@@ -53,7 +52,7 @@ def read_private_item_one_service(user: User, session: Session, item_id: int) ->
     result = get_item_one(session, search)
     
     if result is None:
-        raise ExceptionNotFound()
+        raise ExceptionItemNotFound_404(item_id)
     
     return result
 
@@ -65,7 +64,7 @@ def read_public_item_one_service(session: Session, item_id: int) -> Item | None:
     result = get_item_one(session, search)
     
     if result is None:
-        raise ExceptionNotFound()
+        raise ExceptionItemNotFound_404(item_id)
     
     return result
 
@@ -77,11 +76,11 @@ def update_item_service(user: User, session: Session, item_id: int, item_update:
     item = get_item_one(session, search, with_for_update=True)
     
     if item is None:
-        raise ExceptionNotFound()
+        raise ExceptionItemNotFound_404(item_id)
     
     # Negative relative quantity
     if item_update.stock_quantity_relative is not None and item_update.stock_quantity_relative + item.stock_quantity < 0:
-        raise ExceptionNegativeValue()
+        raise ExceptionInvalidValue_409("Item stock quantity", item_update.stock_quantity_relative + item.stock_quantity)
     
     # Actual update code
     update_data = item_update.model_dump(exclude_unset=True)
@@ -106,7 +105,7 @@ def delete_item_service(user: User, session: Session, item_id: int) -> Item:
     item = get_item_one(session, search, with_for_update=True) # with_for_update used because this depends on banned and deleted status.
     
     if item is None:
-        raise ExceptionNotFound()
+        raise ExceptionItemNotFound_404(item_id)
     
     # Soft delete so pending orders still have to get delivered.
     item.is_active = False
@@ -140,7 +139,7 @@ def restore_item_service(user: User, session: Session, item_id: int) -> Item:
     item = get_item_one(session, search, with_for_update=True) # with_for_update just in case, but is probably unnecessary.
     
     if item is None:
-        raise ExceptionNotFound()
+        raise ExceptionItemNotFound_404(item_id)
     
     item.is_deleted = False
     

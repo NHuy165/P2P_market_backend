@@ -1,12 +1,12 @@
 from pydantic import EmailStr
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from src.services.items.core import delete_items_all_service
 
-from ...models.orders import Order, OrderStatus
+from ...models_schemas.orders import Order, OrderStatus
 from ...core.security import get_hashed, verify_hashed
-from ...models.users import PasswordUpdate, User, UserInput, UserUpdate
-from ...exceptions import ExceptionAuth, ExceptionConflict, ExceptionForbidden, ExceptionNotFound, ExceptionTakenUserEmail, ExceptionTakenUserName
+from ...models_schemas.users import PasswordUpdate, User, UserInput, UserUpdate
+from ...models_schemas.exceptions import ExceptionActivationStatus_409, ExceptionAuthentication_401, ExceptionBanStatus_409, ExceptionModifiedAdmin_403, ExceptionPendingOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionUserNotFound_404
 
 # ----- User create ----- #
 
@@ -15,14 +15,14 @@ def check_name_exists(username: str, session: Session):
     result = session.exec(check).first()
     
     if result is not None:
-        raise ExceptionTakenUserName()
+        raise ExceptionTakenUserName_409()
         
 def check_email_exists(email: EmailStr, session: Session):
     check = select(User).where(User.email == email)
     result = session.exec(check).first()
     
     if result is not None:
-        raise ExceptionTakenUserEmail()
+        raise ExceptionTakenUserEmail_409()
 
 def register_user_service(user: UserInput, session: Session) -> User:
     check_name_exists(user.username, session)
@@ -40,11 +40,11 @@ def register_user_service(user: UserInput, session: Session) -> User:
 
 # ----- User read ----- #
 
-def read_account_service(session: Session, search_id: int) -> User:
-    user = session.get(User, search_id)
+def read_account_service(session: Session, user_id: int) -> User:
+    user = session.get(User, user_id)
     
     if user is None:
-        raise ExceptionNotFound()
+        raise ExceptionUserNotFound_404(user_id)
     
     return user
 
@@ -61,7 +61,7 @@ def update_account_service(user: User, session: Session, update_info: UserUpdate
     
 def update_password_service(user: User, session: Session, update_info: PasswordUpdate) -> None:
     if not verify_hashed(update_info.old_password, user.hashed_password):
-        raise ExceptionAuth()
+        raise ExceptionAuthentication_401()
     
     new_pass = get_hashed(update_info.new_password)
     user.sqlmodel_update({"hashed_password": new_pass})
@@ -75,13 +75,13 @@ def change_active_status_service(session: Session, user_id: int, activate: bool)
     user = session.get(User, user_id)
     
     if user is None:
-        raise ExceptionNotFound()
+        raise ExceptionUserNotFound_404(user_id)
     
     if user.is_admin:
-        raise ExceptionForbidden()
+        raise ExceptionModifiedAdmin_403()
     
     if (user.is_active is True and activate is True) or (user.is_active is False and activate is False):
-        raise ExceptionConflict()
+        raise ExceptionActivationStatus_409(activated=user.is_active)
     
     if activate:
         user.is_active = True
@@ -98,13 +98,14 @@ def change_active_status_service(session: Session, user_id: int, activate: bool)
     
 def delete_user_service(user: User, session: Session, password: str) -> User:
     if not verify_hashed(password, user.hashed_password):
-        raise ExceptionAuth()
+        raise ExceptionAuthentication_401()
     
-    query = select(Order).where(Order.seller_id == user.id, Order.status == OrderStatus.PENDING)
+    query = select(Order).where(or_(Order.seller_id == user.id, Order.buyer_id == user.id), Order.status == OrderStatus.PENDING)
     result = session.exec(query).first()
     
+    # Pending orders exist
     if result is not None:
-        raise ExceptionConflict()
+        raise ExceptionPendingOrders_409()
     
     delete_items_all_service(user, session)
     
@@ -121,16 +122,19 @@ def change_ban_status_service(session: Session, user_id: int, ban: bool) -> User
     user = session.get(User, user_id)
     
     if user is None:
-        raise ExceptionNotFound()
+        raise ExceptionUserNotFound_404(user_id)
     
     if user.is_admin:
-        raise ExceptionForbidden()
+        raise ExceptionModifiedAdmin_403()
     
     if (user.is_banned is True and ban is True) or (user.is_banned is False and ban is False):
-        raise ExceptionConflict()
+        raise ExceptionBanStatus_409(banned=user.is_banned)
     
-    user.is_active = False
-    user.is_banned = True
+    if user.is_banned:
+        user.is_banned = False
+    else:   
+        user.is_active = False
+        user.is_banned = True
     
     session.add(user)
     session.commit()
