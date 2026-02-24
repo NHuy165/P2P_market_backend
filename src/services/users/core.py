@@ -1,7 +1,7 @@
 from pydantic import EmailStr
 from sqlmodel import Session, or_, select
 
-from src.services.items.core import delete_items_all_service
+from src.services.items.core import suspend_items_all_service
 
 from ...models_schemas.orders import Order, OrderStatus
 from ...core.security import get_hashed, verify_hashed
@@ -107,7 +107,7 @@ def delete_user_service(user: User, session: Session, password: str) -> User:
     if result is not None:
         raise ExceptionPendingOrders_409()
     
-    delete_items_all_service(user, session)
+    suspend_items_all_service(user, session)
     
     user.is_active = False
     user.is_deleted = True

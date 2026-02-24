@@ -13,10 +13,20 @@ class ItemBase(SQLModel):
     stock_quantity: Annotated[int, Field(ge=0)] = 0 
     
 # ----- INPUT ----- #
+
+class ItemStatus(Enum):
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    BANNED = "BANNED"
+    DELETED = "DELETED"
+    
+class ItemStatusRestricted(Enum):
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
     
 # Item creation
 class ItemInput(ItemBase):
-    is_active: bool = False
+    status: ItemStatusRestricted
     
 # ----- OUTPUT PUBLIC ----- #
     
@@ -36,26 +46,22 @@ class ItemOutput(ItemOutputNoRelationship):
     
 # ----- OUTPUT PRIVATE ----- #
 
-from .orders import OrderOutputNoType
 # Item shown to account owner and admins
+from .orders import OrderOutputNoType
 class ItemOutputPrivate(ItemOutput):
-    is_active: bool
-    is_banned: bool
-    is_deleted: bool
+    status: ItemStatus
+    deleted_at: datetime | None = None
     
     orders: list[OrderOutputNoType]
     
 # ----- SEARCH ----- #
 
 class ItemSearch(BaseModel):
-    item_id: int | None = None
+    id: int | None = None
+    name: str | None = None
+    
+    # This are for other users browsing, the seller doesn't need it.
     seller_id: int | None = None 
-    
-    item_name: str | None = None
-    
-    include_banned: bool = False
-    include_deleted: bool = False
-    include_inactive: bool = False
 
 # ----- SORT AND FILTER ----- #
 
@@ -67,14 +73,12 @@ class ItemAttrSortPrivate(str, Enum):
     item_stock_quantity = "stock_quantity"
     item_created_at = "created_at"
 
-    item_is_active = "is_active"
-    item_is_deleted = "is_deleted"
-    item_is_banned = "is_banned"
+    item_status = "status"
     
 class ItemAttrSortPublic(str, Enum):
     item_id = "id"
-    
     item_name = "name"
+    
     item_price = "price"
     item_stock_quantity = "stock_quantity"
     item_created_at = "created_at"
@@ -82,10 +86,6 @@ class ItemAttrSortPublic(str, Enum):
     item_seller_id = "seller_id"
     
 class ItemSortFilterBase(BaseModel):
-    id: int | None = None
-    
-    name: str | None = None
-    
     price_lower: float | None = None
     price_upper: float | None = None
     
@@ -100,15 +100,12 @@ class ItemSortFilterBase(BaseModel):
 class ItemSortFilterPublic(ItemSortFilterBase):
     sorted_by: ItemAttrSortPublic | None = None    
     
-    seller_id: int | None = None
-    seller_name: str | None = None
-    
 class ItemSortFilterPrivate(ItemSortFilterBase):
     sorted_by: ItemAttrSortPrivate | None = None
     
-    is_active: bool | None = None
-    is_deleted: bool | None = None
-    is_banned: bool | None = None 
+    include_active: bool = True
+    include_suspended: bool = False
+    include_banned: bool = False
     
 # ----- UPDATE ----- #
 
@@ -119,12 +116,9 @@ class ItemUpdate(ItemBase):
     stock_quantity: Annotated[int | None, Field(ge=0)] = None
     stock_quantity_relative: int | None = None
     
-    is_active: bool | None = None
+    status: ItemStatusRestricted | None = None
     # is_deleted: bool | None = None (item deletion is done via a separate request)
-    
-class ItemUpdateAdmin(ItemUpdate):
-    is_banned: bool | None = None
-    
+
 # ----- DATABASE ----- #
     
 if TYPE_CHECKING:
@@ -137,10 +131,9 @@ class Item(ItemBase, table=True):
     seller_id: Annotated[int | None, Field(foreign_key="user.id")] = None
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    deleted_at: datetime | None = None
     
-    is_active: bool = False
-    is_deleted: bool = False
-    is_banned: bool = False
+    status: ItemStatus
     
     seller: "User" = Relationship(back_populates='items') # The user this item belongs to
     orders: list["Order"] = Relationship(back_populates='item') # The orders associated with this item

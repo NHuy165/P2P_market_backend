@@ -5,7 +5,7 @@ from src.core.dependencies import UserDep
 
 from ...core.database import SessionDep
 from ...models_schemas.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
-from ...services.items.core import create_item_service, delete_items_all_service, restore_item_service, update_item_service, read_private_items_many_service, read_public_items_many_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
+from ...services.items.core import create_item_service, suspend_items_all_service, read_private_items_all_service, read_private_items_with_sf_service, read_public_items_all_service, read_public_items_with_sf_service, restore_item_service, update_item_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
 from ...models_schemas.exceptions import *
 
 router = APIRouter()
@@ -30,15 +30,18 @@ def create_item(user: UserDep, session: SessionDep, item: ItemInput):
                 403: Responses.RESPONSE_403_FORBIDDEN,
             })
 def read_private_items_all(user: UserDep, session: SessionDep):
-    return read_private_items_many_service(user, session)
+    """
+    Read all items, including banned and suspended, excluding deleted, from the current user.
+    """
+    return read_private_items_all_service(user, session)
 
 @router.get("/my-items", response_model=list[ItemOutputPrivate],
             responses={
                 401: Responses.RESPONSE_401_UNAUTHORIZED,
                 403: Responses.RESPONSE_403_FORBIDDEN,
             })
-def read_private_items_sort_filter(user: UserDep, session: SessionDep, sort_filter: Annotated[ItemSortFilterPrivate, Query()]):
-    return read_private_items_many_service(user, session, sort_filter)
+def read_private_items_with_sf(user: UserDep, session: SessionDep, sort_filter: Annotated[ItemSortFilterPrivate, Query()]):
+    return read_private_items_with_sf_service(user, session, sort_filter)
 
 @router.get("/my-items/{item_id}", response_model=ItemOutputPrivate,
             responses={
@@ -53,11 +56,11 @@ def read_private_item_one(user: UserDep, session: SessionDep, item_id: Annotated
 
 @router.get("/", response_model=list[ItemOutput])
 def read_public_items_all(session: SessionDep):
-    return read_public_items_many_service(session)
+    return read_public_items_all_service(session)
 
 @router.get("", response_model=list[ItemOutput])
-def read_public_items_sort_filter(session: SessionDep, sort_filter: Annotated[ItemSortFilterPublic, Query()]):
-    return read_public_items_many_service(session, sort_filter)
+def read_public_items_with_sf(session: SessionDep, sort_filter: Annotated[ItemSortFilterPublic, Query()]):
+    return read_public_items_with_sf_service(session, sort_filter)
 
 @router.get("/{item_id}", response_model=ItemOutput,
             responses={
@@ -91,6 +94,27 @@ def update_item(user: UserDep, session: SessionDep, item_id: int, item_update: I
     assert user.id is not None
     new_item = update_item_service(user, session, item_id, item_update)
     return new_item
+
+@router.patch("/{item_id}/restore", response_model=ItemOutputPrivate,
+             responses={
+                 401: Responses.RESPONSE_401_UNAUTHORIZED,
+                 403: Responses.RESPONSE_403_FORBIDDEN,
+             })
+def restore_item(user: UserDep, session: SessionDep, item_id: int):
+    item_restored = restore_item_service(user, session, item_id)
+    return item_restored
+
+@router.patch("/", response_model=list[ItemOutputPrivate],
+               responses={
+                   401: Responses.RESPONSE_401_UNAUTHORIZED,
+                   403: Responses.RESPONSE_403_FORBIDDEN,
+               })
+def suspend_items_all(user: UserDep, session: SessionDep):
+    """
+    Mainly used when users are about to delete their account. So their items do not get ordered anymore.
+    """
+    items_suspended = suspend_items_all_service(user, session)
+    return items_suspended
         
 # ----- Item delete ----- #
 
@@ -106,27 +130,6 @@ def delete_item(user: UserDep, session: SessionDep, item_id: int):
     """
     item_deleted = delete_item_service(user, session, item_id)
     return item_deleted
-
-@router.delete("/", response_model=list[ItemOutputPrivate],
-               responses={
-                   401: Responses.RESPONSE_401_UNAUTHORIZED,
-                   403: Responses.RESPONSE_403_FORBIDDEN,
-               })
-def delete_items_all(user: UserDep, session: SessionDep):
-    """
-    Mainly used when users are about to delete their account. So their items do not get ordered anymore.
-    """
-    items_deleted = delete_items_all_service(user, session)
-    return items_deleted
-        
-@router.post("/{item_id}", response_model=ItemOutputPrivate,
-             responses={
-                 401: Responses.RESPONSE_401_UNAUTHORIZED,
-                 403: Responses.RESPONSE_403_FORBIDDEN,
-             })
-def restore_item(user: UserDep, session: SessionDep, item_id: int):
-    item_restored = restore_item_service(user, session, item_id)
-    return item_restored
 
 
 

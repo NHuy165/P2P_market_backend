@@ -2,16 +2,17 @@ from sqlmodel import Session
 
 from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionItemNotFound_404, ExceptionTakenItemName_409
 from ...models_schemas.users import User
-from ...models_schemas.items import Item, ItemInput, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
-from .get import get_item_one, get_items_many
+from ...models_schemas.items import Item, ItemInput, ItemStatus, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
+from .get import get_items, get_items
 
 # ----- Item create ----- #
 
 def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
     assert user.id is not None
     # Checks for overlapping names, does not check among banned and deleted items.
-    search = ItemSearch(seller_id=user.id, item_name=item.name, include_inactive=True)
-    existing = get_item_one(session, search)
+    search = ItemSearch(seller_id=user.id, name=item.name)
+    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_banned=True)
+    existing = get_items(session, search, many=False, sf_private=sort_filter)
     
     if existing is not None:
         raise ExceptionTakenItemName_409()
@@ -26,57 +27,70 @@ def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
 
 # ----- Item read ----- #
 
-def read_private_items_many_service(user: User, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
-    '''
-    Gets ALL items, including banned, deleted and inactive.
-    '''
-    search = ItemSearch(seller_id=user.id, include_banned=True, include_deleted=True, include_inactive=True)
-    result = get_items_many(session, search, filter_private=sort_filter)
-    
-    return result
+def read_private_items_all_service(user: User, session: Session) -> list[Item]:
+    search = ItemSearch(seller_id=user.id)
+    sort_filter = ItemSortFilterPrivate(include_banned=True, include_suspended=True)
+    result = get_items(session, search, many=True, sf_private=sort_filter)
+    return result # type: ignore
 
-def read_public_items_many_service(session: Session, sort_filter: ItemSortFilterPublic | None = None) -> list[Item]:
-    '''
-    Public orders will only show non-banned, non-deleted and active functions.
-    '''
-    search = ItemSearch()
-    result = get_items_many(session, search, filter_public=sort_filter)
-    
-    return result
+def read_private_items_with_sf_service(user: User, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
+    search = ItemSearch(seller_id=user.id)
+    result = get_items(session, search, many=True, sf_private=sort_filter)
+    return result # type: ignore
 
 def read_private_item_one_service(user: User, session: Session, item_id: int) -> Item | None:
-    '''
-    Like the "get all" alternative, but only gets one item, based on id.
-    '''
-    search = ItemSearch(item_id=item_id, seller_id=user.id, include_banned=True, include_deleted=True, include_inactive=True)
-    result = get_item_one(session, search)
+    search = ItemSearch(id=item_id, seller_id=user.id)
+    sort_filter = ItemSortFilterPrivate(include_banned=True, include_suspended=True)
+    result = get_items(session, search, many=False, sf_private=sort_filter)
     
     if result is None:
         raise ExceptionItemNotFound_404(item_id)
     
-    return result
+    return result # type: ignore
+
+def read_public_items_all_service(session: Session) -> list[Item]:
+    '''
+    Public reading will only show active items.
+    '''
+    search = ItemSearch()
+    sort_filter = ItemSortFilterPublic() # Enforces active items only by default
+    result = get_items(session, search, many=True, sf_public=sort_filter)
+    
+    return result # type: ignore
+
+def read_public_items_with_sf_service(session: Session, sort_filter: ItemSortFilterPublic | None = None) -> list[Item]:
+    '''
+    Public reading will only show active items.
+    '''
+    search = ItemSearch()
+    result = get_items(session, search, many=True, sf_public=sort_filter)
+    
+    return result # type: ignore
 
 def read_public_item_one_service(session: Session, item_id: int) -> Item | None:
     '''
     Like the "get all" alternative, but only gets one item, based on id.
     '''
-    search = ItemSearch(item_id=item_id)
-    result = get_item_one(session, search)
+    search = ItemSearch(id=item_id)
+    sort_filter = ItemSortFilterPublic() # Enforces active items only by default
+    result = get_items(session, search, many=False, sf_public=sort_filter)
     
     if result is None:
         raise ExceptionItemNotFound_404(item_id)
     
-    return result
+    return result # type: ignore
 
 # ----- Item update ----- #
 
 def update_item_service(user: User, session: Session, item_id: int, item_update: ItemUpdate) -> Item:
-    # Cannot edit banned and deleted items (enforced by default by ItemSearch).
-    search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True)
-    item = get_item_one(session, search, with_for_update=True)
+    # Cannot edit banned and deleted items.
+    search = ItemSearch(seller_id=user.id, id=item_id)
+    sort_filter = ItemSortFilterPrivate(include_suspended=True)
+    item = get_items(session, search, many=False, sf_private=sort_filter, with_for_update=True)
     
     if item is None:
         raise ExceptionItemNotFound_404(item_id)
+    assert isinstance(item, Item)
     
     # Negative relative quantity
     if item_update.stock_quantity_relative is not None and item_update.stock_quantity_relative + item.stock_quantity < 0:
@@ -96,35 +110,15 @@ def update_item_service(user: User, session: Session, item_id: int, item_update:
     
     return item
 
-
-# ----- Item delete ----- #
-
-def delete_item_service(user: User, session: Session, item_id: int) -> Item:
-    # Banned and deleted items count as deleted and cannot be deleted again (enforced by default by ItemSearch).
-    search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True)
-    item = get_item_one(session, search, with_for_update=True) # with_for_update used because this depends on banned and deleted status.
-    
-    if item is None:
-        raise ExceptionItemNotFound_404(item_id)
-    
-    # Soft delete so pending orders still have to get delivered.
-    item.is_active = False
-    item.is_deleted = True
-    
-    session.add(item)
-    session.commit()
-    session.refresh(item)
-    
-    return item
-    
 # Used for when you want to delete your account
-def delete_items_all_service(user: User, session: Session) -> list[Item]:
-    search = ItemSearch(seller_id=user.id, include_inactive=True)
-    items = get_items_many(session, search, with_for_update=True) # with_for_update for reasons similar to above
+def suspend_items_all_service(user: User, session: Session) -> list[Item]:
+    search = ItemSearch(seller_id=user.id)
+    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_banned=True)
+    items = get_items(session, search, many=True, sf_private=sort_filter, with_for_update=True) # with_for_update for reasons similar to above
+    assert isinstance(items, list)
     
     for item in items:
-        item.is_active = False
-        item.is_deleted = True
+        item.status = ItemStatus.SUSPENDED
         
     session.add_all(items)
     session.commit()
@@ -133,15 +127,38 @@ def delete_items_all_service(user: User, session: Session) -> list[Item]:
         session.refresh(item)
     
     return items
-    
+
 def restore_item_service(user: User, session: Session, item_id: int) -> Item:
-    search = ItemSearch(seller_id=user.id, item_id=item_id, include_inactive=True, include_deleted=True) 
-    item = get_item_one(session, search, with_for_update=True) # with_for_update just in case, but is probably unnecessary.
+    search = ItemSearch(seller_id=user.id, id=item_id)
+    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_active=False)
+    item = get_items(session, search, many=False, sf_private=sort_filter, with_for_update=True) # with_for_update just in case, but is probably unnecessary since these items don't get interacted with anyways.
     
     if item is None:
         raise ExceptionItemNotFound_404(item_id)
+    assert isinstance(item, Item)
     
-    item.is_deleted = False
+    item.status = ItemStatus.ACTIVE
+    
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    
+    return item
+
+# ----- Item delete ----- #
+
+def delete_item_service(user: User, session: Session, item_id: int) -> Item:
+    # Banned and deleted items count as deleted and cannot be deleted again.
+    search = ItemSearch(seller_id=user.id, id=item_id)
+    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_banned=True)
+    item = get_items(session, search, many=False, sf_private=sort_filter, with_for_update=True)
+    
+    if item is None:
+        raise ExceptionItemNotFound_404(item_id)
+    assert isinstance(item, Item)
+    
+    # Soft delete so pending orders still have to get delivered.
+    item.status = ItemStatus.DELETED
     
     session.add(item)
     session.commit()
