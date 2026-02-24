@@ -4,7 +4,7 @@ from typing import Annotated
 from src.core.dependencies import UserDep
 
 from ...core.database import SessionDep
-from ...services.users.core import delete_user_service, register_user_service, read_account_service, update_account_service
+from ...services.users.core import delete_user_service, register_user_service, read_user_service, update_account_service
 from ...models_schemas.users import UserInput, UserOutput, UserOutputPrivate, UserUpdate
 from ...models_schemas.exceptions import *
 
@@ -37,8 +37,8 @@ def read_my_account(user: UserDep):
             responses={
                 404: Responses.RESPONSE_404_NOT_FOUND
                 }) 
-def read_account(session: SessionDep, user_id: int):
-    result = read_account_service(session, user_id)
+def read_user(session: SessionDep, user_id: int):
+    result = read_user_service(session, user_id)
     return result
 
 # ----- User update ----- #

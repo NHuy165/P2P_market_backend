@@ -29,7 +29,7 @@ class ExceptionType(Enum):
     TAKEN_USER_NAME = "TAKEN_USER_NAME"
     TAKEN_USER_EMAIL = "TAKEN_USER_EMAIL"
     TAKEN_ITEM_NAME = "TAKEN_ITEM_NAME"
-    PENDING_ORDERS = "PENDING_ORDERS"
+    UNFINISHED_ORDERS = "UNFINISHED_ORDERS"
     ACTIVATION_STATUS = "ACTIVATION_STATUS"
     BAN_STATUS = "BAN_STATUS"
     INVALID_VALUE = "INVALID_VALUE"
@@ -143,9 +143,9 @@ class ExceptionTakenItemName_409(ExceptionCustom):
     def __init__(self):
         super().__init__(409, ExceptionType.TAKEN_ITEM_NAME, "Another one of your items already has this name.")
 
-class ExceptionPendingOrders_409(ExceptionCustom):
+class ExceptionUnfinishedOrders_409(ExceptionCustom):
     def __init__(self):
-        super().__init__(409, ExceptionType.PENDING_ORDERS, "Your account still has pending buy or sell orders.")
+        super().__init__(409, ExceptionType.UNFINISHED_ORDERS, "Your account still has unfinished orders.")
 
 class ExceptionActivationStatus_409(ExceptionCustom):
     def __init__(self, activated: bool):

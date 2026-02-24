@@ -1,27 +1,27 @@
 from pydantic import EmailStr
 from sqlmodel import Session, or_, select
 
-from src.services.items.core import suspend_items_all_service
-
+from ..items.core import delete_items_all_service, suspend_items_all_service
+from .get import get_user_service
 from ...models_schemas.orders import Order, OrderStatus
 from ...core.security import get_hashed, verify_hashed
-from ...models_schemas.users import PasswordUpdate, User, UserInput, UserUpdate
-from ...models_schemas.exceptions import ExceptionActivationStatus_409, ExceptionAuthentication_401, ExceptionBanStatus_409, ExceptionModifiedAdmin_403, ExceptionPendingOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionUserNotFound_404
+from ...models_schemas.users import PasswordUpdate, User, UserGet, UserInput, UserStatus, UserUpdate
+from ...models_schemas.exceptions import ExceptionActivationStatus_409, ExceptionAuthentication_401, ExceptionBanStatus_409, ExceptionModifiedAdmin_403, ExceptionUnfinishedOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionUserNotFound_404
 
 # ----- User create ----- #
 
 def check_name_exists(username: str, session: Session):
-    check = select(User).where(User.username == username)
-    result = session.exec(check).first()
+    user_get = UserGet(username=username)
+    user = get_user_service(session, user_get)
     
-    if result is not None:
+    if user is not None:
         raise ExceptionTakenUserName_409()
         
 def check_email_exists(email: EmailStr, session: Session):
-    check = select(User).where(User.email == email)
-    result = session.exec(check).first()
+    user_get = UserGet(email=email)
+    user = get_user_service(session, user_get)
     
-    if result is not None:
+    if user is not None:
         raise ExceptionTakenUserEmail_409()
 
 def register_user_service(user: UserInput, session: Session) -> User:
@@ -40,8 +40,9 @@ def register_user_service(user: UserInput, session: Session) -> User:
 
 # ----- User read ----- #
 
-def read_account_service(session: Session, user_id: int) -> User:
-    user = session.get(User, user_id)
+def read_user_service(session: Session, user_id: int) -> User:
+    user_get = UserGet(id=user_id)
+    user = get_user_service(session, user_get)
     
     if user is None:
         raise ExceptionUserNotFound_404(user_id)
@@ -71,46 +72,24 @@ def update_password_service(user: User, session: Session, update_info: PasswordU
     
     # returns nothing
     
-def change_active_status_service(session: Session, user_id: int, activate: bool) -> User:
-    user = session.get(User, user_id)
-    
-    if user is None:
-        raise ExceptionUserNotFound_404(user_id)
-    
-    if user.is_admin:
-        raise ExceptionModifiedAdmin_403()
-    
-    if (user.is_active is True and activate is True) or (user.is_active is False and activate is False):
-        raise ExceptionActivationStatus_409(activated=user.is_active)
-    
-    if activate:
-        user.is_active = True
-    else:
-        user.is_active = False
-    
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-    
-    return user
-    
 # ----- User delete ----- #
     
 def delete_user_service(user: User, session: Session, password: str) -> User:
     if not verify_hashed(password, user.hashed_password):
         raise ExceptionAuthentication_401()
     
-    query = select(Order).where(or_(Order.seller_id == user.id, Order.buyer_id == user.id), Order.status == OrderStatus.PENDING)
+    # Checks for existing unfinished order
+    query = select(Order).where(or_(Order.seller_id == user.id, Order.buyer_id == user.id), Order.status is not OrderStatus.DELIVERED)
     result = session.exec(query).first()
-    
-    # Pending orders exist
     if result is not None:
-        raise ExceptionPendingOrders_409()
+        raise ExceptionUnfinishedOrders_409()
     
-    suspend_items_all_service(user, session)
+    # Deletion
     
-    user.is_active = False
-    user.is_deleted = True
+    # Deletes all items
+    delete_items_all_service(user, session)
+
+    user.status = UserStatus.DELETED
     
     session.add(user)
     session.commit()
@@ -119,7 +98,8 @@ def delete_user_service(user: User, session: Session, password: str) -> User:
     return user
 
 def change_ban_status_service(session: Session, user_id: int, ban: bool) -> User:
-    user = session.get(User, user_id)
+    user_get = UserGet(id=user_id, include_banned=True)
+    user = get_user_service(session, user_get)
     
     if user is None:
         raise ExceptionUserNotFound_404(user_id)
@@ -127,14 +107,16 @@ def change_ban_status_service(session: Session, user_id: int, ban: bool) -> User
     if user.is_admin:
         raise ExceptionModifiedAdmin_403()
     
-    if (user.is_banned is True and ban is True) or (user.is_banned is False and ban is False):
-        raise ExceptionBanStatus_409(banned=user.is_banned)
+    if (user.status is UserStatus.BANNED and ban is True) or (user.status is not UserStatus.BANNED is False and ban is False):
+        raise ExceptionBanStatus_409(banned=user.status is UserStatus.BANNED)
     
-    if user.is_banned:
-        user.is_banned = False
+    if user.status is UserStatus.BANNED:
+        user.status = UserStatus.ACTIVE
+        # User has to manually reactivate his items here...
+        
     else:   
-        user.is_active = False
-        user.is_banned = True
+        user.status = UserStatus.BANNED
+        suspend_items_all_service(user, session)
     
     session.add(user)
     session.commit()

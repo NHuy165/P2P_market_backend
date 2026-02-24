@@ -4,7 +4,7 @@ from typing import Annotated
 from src.core.dependencies import UserDep
 
 from ...core.database import SessionDep
-from ...models_schemas.items import ItemInput, ItemOutput, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
+from ...models_schemas.items import ItemInput, ItemOutput, ItemSearch, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
 from ...services.items.core import create_item_service, suspend_items_all_service, read_private_items_all_service, read_private_items_with_sf_service, read_public_items_all_service, read_public_items_with_sf_service, restore_item_service, update_item_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
 from ...models_schemas.exceptions import *
 
@@ -40,8 +40,8 @@ def read_private_items_all(user: UserDep, session: SessionDep):
                 401: Responses.RESPONSE_401_UNAUTHORIZED,
                 403: Responses.RESPONSE_403_FORBIDDEN,
             })
-def read_private_items_with_sf(user: UserDep, session: SessionDep, sort_filter: Annotated[ItemSortFilterPrivate, Query()]):
-    return read_private_items_with_sf_service(user, session, sort_filter)
+def read_private_items_with_sf(user: UserDep, session: SessionDep, search: ItemSearch, sort_filter: Annotated[ItemSortFilterPrivate, Query()]):
+    return read_private_items_with_sf_service(user, session, search, sort_filter)
 
 @router.get("/my-items/{item_id}", response_model=ItemOutputPrivate,
             responses={
@@ -59,8 +59,8 @@ def read_public_items_all(session: SessionDep):
     return read_public_items_all_service(session)
 
 @router.get("", response_model=list[ItemOutput])
-def read_public_items_with_sf(session: SessionDep, sort_filter: Annotated[ItemSortFilterPublic, Query()]):
-    return read_public_items_with_sf_service(session, sort_filter)
+def read_public_items_with_sf(session: SessionDep, search: ItemSearch, sort_filter: Annotated[ItemSortFilterPublic, Query()]):
+    return read_public_items_with_sf_service(session, search, sort_filter)
 
 @router.get("/{item_id}", response_model=ItemOutput,
             responses={

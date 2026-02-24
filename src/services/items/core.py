@@ -33,8 +33,8 @@ def read_private_items_all_service(user: User, session: Session) -> list[Item]:
     result = get_items(session, search, many=True, sf_private=sort_filter)
     return result # type: ignore
 
-def read_private_items_with_sf_service(user: User, session: Session, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
-    search = ItemSearch(seller_id=user.id)
+def read_private_items_with_sf_service(user: User, session: Session, search: ItemSearch, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
+    search.seller_id = user.id
     result = get_items(session, search, many=True, sf_private=sort_filter)
     return result # type: ignore
 
@@ -58,11 +58,10 @@ def read_public_items_all_service(session: Session) -> list[Item]:
     
     return result # type: ignore
 
-def read_public_items_with_sf_service(session: Session, sort_filter: ItemSortFilterPublic | None = None) -> list[Item]:
+def read_public_items_with_sf_service(session: Session, search: ItemSearch, sort_filter: ItemSortFilterPublic | None = None) -> list[Item]:
     '''
     Public reading will only show active items.
     '''
-    search = ItemSearch()
     result = get_items(session, search, many=True, sf_public=sort_filter)
     
     return result # type: ignore
@@ -113,12 +112,32 @@ def update_item_service(user: User, session: Session, item_id: int, item_update:
 # Used for when you want to delete your account
 def suspend_items_all_service(user: User, session: Session) -> list[Item]:
     search = ItemSearch(seller_id=user.id)
-    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_banned=True)
+    sort_filter = ItemSortFilterPrivate(include_banned=True)
     items = get_items(session, search, many=True, sf_private=sort_filter, with_for_update=True) # with_for_update for reasons similar to above
     assert isinstance(items, list)
     
     for item in items:
         item.status = ItemStatus.SUSPENDED
+        
+    session.add_all(items)
+    session.commit()
+    
+    for item in items:
+        session.refresh(item)
+    
+    return items
+
+def delete_items_all_service(user: User, session: Session) -> list[Item]:
+    """
+    This function is automatically called upon user deletion.
+    """
+    search = ItemSearch(seller_id=user.id)
+    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_banned=True)
+    items = get_items(session, search, many=True, sf_private=sort_filter, with_for_update=True) # with_for_update for reasons similar to above
+    assert isinstance(items, list)
+    
+    for item in items:
+        item.status = ItemStatus.DELETED
         
     session.add_all(items)
     session.commit()

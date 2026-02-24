@@ -59,8 +59,6 @@ class ItemOutputPrivate(ItemOutput):
 class ItemSearch(BaseModel):
     id: int | None = None
     name: str | None = None
-    
-    # This are for other users browsing, the seller doesn't need it.
     seller_id: int | None = None 
 
 # ----- SORT AND FILTER ----- #

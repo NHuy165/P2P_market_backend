@@ -2,6 +2,7 @@ from pydantic import EmailStr, BaseModel
 from typing import Annotated, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime, timezone
+from enum import Enum
 
 # ----- BASE ----- #
 
@@ -25,6 +26,11 @@ class UserOutput(UserBase):
     created_at: datetime
     
 # ----- OUTPUT PRIVATE ----- #
+
+class UserStatus(Enum):
+    ACTIVE = "ACTIVE"
+    BANNED = "BANNED"
+    DELETED = "DELETED"
     
 from .items import ItemOutput
 
@@ -34,25 +40,32 @@ class UserOutputPrivate(UserOutput):
     balance: float
     
     is_active: bool
-    is_admin: bool
-    is_banned: bool
-    is_deleted: bool
+    status: UserStatus
     
     items: list[ItemOutput]
     
-# ----- SORT AND FILTER ----- #
+# ----- SEARCH, SORT AND FILTER ----- #
 
-# ----- FILTER ----- #
+class UserGet(BaseModel):
+    """
+    Since User doesn't have complex sorting and filtering, we cram everything into 1 model.
+    """
+    id: int | None = None
+    username: str | None = None
+    email: EmailStr | None = None
+    
+    include_admin: bool = False
+    include_active: bool = True
+    include_banned: bool = False
+    include_deleted: bool = False
 
 # ----- UPDATE ----- #
 
 class UserUpdate(UserBase):
     username: Annotated[str | None, Field(regex=r"^[a-zA-Z0-9_]+$")] = None
     email: EmailStr | None = None
-    # password: Annotated[str | None, Field(min_length=8)] = None (this is handled by PasswordUpdate)
     description: str | None = None
-    
-    is_active: bool | None = None
+
     # is_deleted: bool | None = None (user deletion is done via a separate request)
     
 class PasswordUpdate(BaseModel):
@@ -76,10 +89,8 @@ class User(UserBase, table=True):
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
-    is_active: bool = True
     is_admin: bool = False
-    is_banned: bool = False
-    is_deleted: bool = False
+    status: UserStatus = UserStatus.ACTIVE
     
     items: list["Item"] = Relationship(back_populates="seller") # Items in stock
     buy_orders: list["Order"] = Relationship(back_populates="buyer") # Associated buy orders
