@@ -5,8 +5,9 @@ from src.core.dependencies import UserDep
 
 from ...core.database import SessionDep
 from ...models_schemas.items import ItemInput, ItemOutput, ItemSearch, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
-from ...services.items.core import create_item_service, suspend_items_all_service, read_private_items_many_service, read_public_items_many_service, restore_item_service, update_item_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
-from ...models_schemas.exceptions import *
+
+from ...services.items.core import create_item_service, suspend_items_all_service, read_private_items_many_service, read_public_items_many_service, update_item_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
+from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionRelativeAbsolute_400, Responses  
 
 router = APIRouter()
 
@@ -41,8 +42,7 @@ def read_private_items_many(user: UserDep, session: SessionDep, search: Annotate
 def read_private_item_one(user: UserDep, session: SessionDep, item_id: Annotated[int, Path(ge=0)]):
     return read_private_item_one_service(user, session, item_id)
 
-# These functions below don't require user to be logged in
-
+# Publicly reading items doesn't require users to be logged in
 
 @router.get("", response_model=list[ItemOutput])
 def read_public_items_many(session: SessionDep, search: Annotated[ItemSearch, Query()], sort_filter: Annotated[ItemSortFilterPublic, Query()]):
@@ -80,15 +80,6 @@ def update_item(user: UserDep, session: SessionDep, item_id: int, item_update: I
     assert user.id is not None
     new_item = update_item_service(user, session, item_id, item_update)
     return new_item
-
-@router.patch("/{item_id}/restore", response_model=ItemOutputPrivate,
-             responses={
-                 401: Responses.RESPONSE_401_UNAUTHORIZED,
-                 403: Responses.RESPONSE_403_FORBIDDEN,
-             })
-def restore_item(user: UserDep, session: SessionDep, item_id: int):
-    item_restored = restore_item_service(user, session, item_id)
-    return item_restored
 
 @router.patch("/", response_model=list[ItemOutputPrivate],
                responses={

@@ -4,7 +4,7 @@ from typing import Annotated
 from ...core.dependencies import UserDep
 from ...models_schemas.exceptions import ExceptionRelativeAbsolute_400, Responses 
 from ...core.database import SessionDep
-from ...models_schemas.orders import OrderInput, OrderOutputNoType, OrderOutput, OrderSortFilter, OrderUpdate
+from ...models_schemas.orders import OrderInput, OrderOutputNoType, OrderOutput, OrderSearchSortFilter, OrderUpdate
 from ...services.orders.core import create_order_service, delete_order_service, read_orders_services, update_order_service
 
 router = APIRouter()
@@ -24,17 +24,13 @@ def create_order(user: UserDep, session: SessionDep, order_inp: OrderInput):
             
 # ----- Order read ----- #
 
-@router.get("/", response_model=list[OrderOutput])
-def read_orders_all(user: UserDep, session: SessionDep):
-    return read_orders_services(user, session)
-
 @router.get("", response_model=list[OrderOutput])
-def read_orders_sort_filter(user: UserDep, session: SessionDep, sort_filter: Annotated[OrderSortFilter, Query()]):
+def read_orders(user: UserDep, session: SessionDep, sort_filter: Annotated[OrderSearchSortFilter, Query()]):
     return read_orders_services(user, session, sort_filter)
     
 # ----- Order update ----- #
 
-@router.patch("/{order_id}", response_model=OrderOutputNoType,
+@router.patch("/{order_id}", response_model=OrderOutput,
               responses={
                   400: Responses.RESPONSE_400_BAD_REQUEST,
                   401: Responses.RESPONSE_401_UNAUTHORIZED,
@@ -51,11 +47,12 @@ def update_order(user: UserDep, session: SessionDep, order_id: int, order_upd: O
         
 # ----- Order delete ----- #
 
-@router.delete("/{order_id}", response_model=OrderOutputNoType,
+@router.delete("/{order_id}", response_model=OrderOutput,
                responses={
                    401: Responses.RESPONSE_401_UNAUTHORIZED,
                    403: Responses.RESPONSE_403_FORBIDDEN,
                    404: Responses.RESPONSE_404_NOT_FOUND,
+                   409: Responses.RESPONSE_409_CONFLICT
                })
 def delete_order(user: UserDep, session: SessionDep, order_id: int):
     order_deleted = delete_order_service(user, session, order_id)

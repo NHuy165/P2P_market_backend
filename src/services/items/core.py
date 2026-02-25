@@ -1,7 +1,9 @@
 from sqlmodel import Session
 
-from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionItemNotFound_404, ExceptionTakenItemName_409
-from ...models_schemas.users import User
+from src.services.users.get import get_user_service
+
+from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionItemNotFound_404, ExceptionStatusOverlap_409, ExceptionTakenItemName_409, ExceptionUserNotFound_404
+from ...models_schemas.users import User, UserGet
 from ...models_schemas.items import Item, ItemInput, ItemStatus, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
 from .get import get_items, get_items
 
@@ -32,8 +34,34 @@ def read_private_items_many_service(user: User, session: Session, search: ItemSe
     result = get_items(session, many=True, search=search, sf_private=sort_filter)
     return result # type: ignore
 
+def read_private_items_many_admin_service(session: Session, user_id: int, search: ItemSearch, sort_filter: ItemSortFilterPrivate | None = None) -> list[Item]:
+    user_get = UserGet(id=user_id,
+                       include_banned=True,
+                       include_deleted=True)
+    user = get_user_service(session, user_get)
+    
+    if user is None:
+        raise ExceptionUserNotFound_404(user_id)
+
+    return read_private_items_many_service(user, session, search, sort_filter=sort_filter)
+
 def read_private_item_one_service(user: User, session: Session, item_id: int) -> Item | None:
-    search = ItemSearch(id=item_id, seller_id=user.id)
+    search = ItemSearch(id=item_id, seller_id=user.id) # Used by normal user to make sure the item belongs to them.
+        
+    sort_filter = ItemSortFilterPrivate(include_banned=True, include_suspended=True)
+    result = get_items(session, many=False, search=search, sf_private=sort_filter)
+    
+    if result is None:
+        raise ExceptionItemNotFound_404(item_id)
+    
+    return result # type: ignore
+
+def read_private_item_one_admin_service(session: Session, item_id: int) -> Item | None:
+    """
+    This entire function is not much different from the normal function. It exists just for clarity's sake.
+    """
+    search = ItemSearch(id=item_id) # The only difference
+        
     sort_filter = ItemSortFilterPrivate(include_banned=True, include_suspended=True)
     result = get_items(session, many=False, search=search, sf_private=sort_filter)
     
@@ -79,6 +107,10 @@ def update_item_service(user: User, session: Session, item_id: int, item_update:
     if item_update.stock_quantity_relative is not None and item_update.stock_quantity_relative + item.stock_quantity < 0:
         raise ExceptionInvalidValue_409("Item stock quantity", item_update.stock_quantity_relative + item.stock_quantity)
     
+    # Activate/suspend overlap
+    if item_update.status == item.status:
+        raise ExceptionStatusOverlap_409("item")
+    
     # Actual update code
     update_data = item_update.model_dump(exclude_unset=True)
     
@@ -111,6 +143,27 @@ def suspend_items_all_service(user: User, session: Session) -> list[Item]:
     
     return items
 
+# ----- Item delete ----- #
+
+def delete_item_service(user: User, session: Session, item_id: int) -> Item:
+    # Banned and deleted items count as deleted and cannot be deleted again.
+    search = ItemSearch(seller_id=user.id, id=item_id)
+    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_banned=True)
+    item = get_items(session, many=False, search=search, sf_private=sort_filter, with_for_update=True)
+    
+    if item is None:
+        raise ExceptionItemNotFound_404(item_id)
+    assert isinstance(item, Item)
+    
+    # Soft delete so pending orders still have to get delivered.
+    item.status = ItemStatus.DELETED
+    
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    
+    return item
+
 def delete_items_all_service(user: User, session: Session) -> list[Item]:
     """
     This function is automatically called upon user deletion.
@@ -131,37 +184,22 @@ def delete_items_all_service(user: User, session: Session) -> list[Item]:
     
     return items
 
-def restore_item_service(user: User, session: Session, item_id: int) -> Item:
-    search = ItemSearch(seller_id=user.id, id=item_id)
-    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_active=False)
-    item = get_items(session, many=False, search=search, sf_private=sort_filter, with_for_update=True) # with_for_update just in case, but is probably unnecessary since these items don't get interacted with anyways.
-    
-    if item is None:
-        raise ExceptionItemNotFound_404(item_id)
-    assert isinstance(item, Item)
-    
-    item.status = ItemStatus.ACTIVE
-    
-    session.add(item)
-    session.commit()
-    session.refresh(item)
-    
-    return item
-
-# ----- Item delete ----- #
-
-def delete_item_service(user: User, session: Session, item_id: int) -> Item:
-    # Banned and deleted items count as deleted and cannot be deleted again.
-    search = ItemSearch(seller_id=user.id, id=item_id)
-    sort_filter = ItemSortFilterPrivate(include_suspended=True, include_banned=True)
+def change_item_ban_status_service(session: Session, item_id: int, ban: bool) -> Item:
+    search = ItemSearch(id=item_id)
+    sort_filter = ItemSortFilterPrivate(include_banned=True)
     item = get_items(session, many=False, search=search, sf_private=sort_filter, with_for_update=True)
+    assert not isinstance(item, list)
     
     if item is None:
         raise ExceptionItemNotFound_404(item_id)
-    assert isinstance(item, Item)
     
-    # Soft delete so pending orders still have to get delivered.
-    item.status = ItemStatus.DELETED
+    if (item.status is ItemStatus.BANNED and ban is True) or (item.status is not ItemStatus.BANNED and ban is False):
+        raise ExceptionStatusOverlap_409("item")
+    
+    if item.status is ItemStatus.BANNED:
+        item.status = ItemStatus.SUSPENDED
+    else:
+        item.status = ItemStatus.BANNED
     
     session.add(item)
     session.commit()

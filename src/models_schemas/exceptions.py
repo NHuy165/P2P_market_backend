@@ -30,8 +30,7 @@ class ExceptionType(Enum):
     TAKEN_USER_EMAIL = "TAKEN_USER_EMAIL"
     TAKEN_ITEM_NAME = "TAKEN_ITEM_NAME"
     UNFINISHED_ORDERS = "UNFINISHED_ORDERS"
-    ACTIVATION_STATUS = "ACTIVATION_STATUS"
-    BAN_STATUS = "BAN_STATUS"
+    STATUS_OVERLAP = "STATUS_OVERLAP"
     INVALID_VALUE = "INVALID_VALUE"
     SELF_OWNED = "SELF_OWNED"
     NOT_PENDING = "NOT_PENDING"
@@ -147,13 +146,9 @@ class ExceptionUnfinishedOrders_409(ExceptionCustom):
     def __init__(self):
         super().__init__(409, ExceptionType.UNFINISHED_ORDERS, "Your account still has unfinished orders.")
 
-class ExceptionActivationStatus_409(ExceptionCustom):
-    def __init__(self, activated: bool):
-        super().__init__(409, ExceptionType.ACTIVATION_STATUS, f"This account is already {"active" if activated else "inactive"}.")
-
-class ExceptionBanStatus_409(ExceptionCustom):
-    def __init__(self, banned: bool):
-        super().__init__(409, ExceptionType.ACTIVATION_STATUS, f"This account is {"already banned" if banned else "not banned"}.")
+class ExceptionStatusOverlap_409(ExceptionCustom):
+    def __init__(self, obj: str):
+        super().__init__(409, ExceptionType.STATUS_OVERLAP, f"This {obj} already has the desired state.")
 
 class ExceptionInvalidValue_409(ExceptionCustom):
     def __init__(self, name: str, value: int | float):

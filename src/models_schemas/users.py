@@ -33,6 +33,8 @@ class UserStatus(Enum):
     DELETED = "DELETED"
     
 from .items import ItemOutput
+from .orders import OrderOutput
+from .transactions import TransactionOutput
 
 # User profile shown to account owner and admins    
 class UserOutputPrivate(UserOutput):
@@ -43,6 +45,12 @@ class UserOutputPrivate(UserOutput):
     status: UserStatus
     
     items: list[ItemOutput]
+    
+    # These would be too heavy
+    
+    # buy_orders: list[OrderOutput]
+    # sell_orders: list[OrderOutput]
+    # transactions: list[TransactionOutput]
     
 # ----- SEARCH, SORT AND FILTER ----- #
 

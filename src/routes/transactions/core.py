@@ -4,7 +4,7 @@ from ...models_schemas.exceptions import Responses
 from ...core.dependencies import UserDep
 from ...core.database import SessionDep
 from ...services.transactions.core import change_money, read_transactions_service  
-from ...models_schemas.transactions import TransactionSortFilter, TransactionType, TransactionOutput, TransactionInput
+from ...models_schemas.transactions import TransactionSearchSortFilter, TransactionType, TransactionOutput, TransactionInput
 
 router = APIRouter()
 
@@ -41,7 +41,7 @@ def read_transactions_all(user: UserDep, session: SessionDep):
     return read_transactions_service(user, session)
 
 @router.get("", response_model=list[TransactionOutput])
-def read_transactions_sort_filter(user: UserDep, session: SessionDep, sort_filter: TransactionSortFilter):
+def read_transactions_sort_filter(user: UserDep, session: SessionDep, sort_filter: TransactionSearchSortFilter):
     return read_transactions_service(user, session, sort_filter)
         
         

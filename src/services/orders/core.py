@@ -1,11 +1,13 @@
-from sqlmodel import Session, case, or_, select
+from sqlmodel import Session, or_, select
 from datetime import datetime, timezone, timedelta
+
+from src.services.users.get import get_user_service
 
 from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionItemNotFound_404, ExceptionNotPending_409, ExceptionOrderNotFound_404, ExceptionSelfOwned_409, ExceptionTimeout_409, ExceptionUserNotFound_404
 from .sort_filter import order_sort_filter
 from ...models_schemas.items import Item
-from ...models_schemas.orders import Order, OrderInput, OrderOutput, OrderSortFilter, OrderUpdate, OrderStatus
-from ...models_schemas.users import User
+from ...models_schemas.orders import Order, OrderInput, OrderOutput, OrderSearchSortFilter, OrderUpdate, OrderStatus
+from ...models_schemas.users import User, UserGet
 from ...models_schemas.transactions import Transaction, TransactionType, TransactionStatus
 
 
@@ -74,28 +76,41 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     
 # ----- Order read ----- #
 
-def read_orders_services(user: User, session: Session, sort_filter: OrderSortFilter | None = None) -> list[OrderOutput]:
+def read_orders_services(user: User, session: Session, sort_filter: OrderSearchSortFilter | None = None) -> list[OrderOutput]:
     query = select(Order)
     
     if sort_filter is not None:
         query = order_sort_filter(query, sort_filter)
         
-        # Only gets sell orders.
+        # Only gets sell orders and labels them.
         if sort_filter.type is True: 
             query = query.where(Order.seller_id == user.id)
             result = [OrderOutput.model_validate(ord, update={"type": "SELL"}) for ord in session.exec(query).all()]
             
-        # Only gets buy orders.
+        # Only gets buy orders and labels them.
         elif sort_filter.type is False:
             query = query.where(Order.buyer_id == user.id)
             result = [OrderOutput.model_validate(ord, update={"type": "BUY"}) for ord in session.exec(query).all()]
 
-    # Gets both types of orders and label accordingly.
+    # Gets both types of orders and labels accordingly.
     if sort_filter is None or sort_filter.type is None:
         query = query.where(or_(Order.seller_id == user.id, Order.buyer_id == user.id))
+        sort_filter = OrderSearchSortFilter()
+        query = order_sort_filter(query, sort_filter)
         result = [OrderOutput.model_validate(ord, update={"type": "SELL" if ord.seller_id == user.id else "BUY"}) for ord in session.exec(query).all()]
     
     return result
+
+def read_orders_admin_service(session: Session, user_id: int, sort_filter: OrderSearchSortFilter | None = None) -> list[OrderOutput]:
+    user_get = UserGet(id=user_id,
+                       include_banned=True,
+                       include_deleted=True)
+    user = get_user_service(session, user_get)
+    
+    if user is None:
+        raise ExceptionUserNotFound_404(user_id)
+    
+    return read_orders_services(user, session, sort_filter)
 
 # ----- Order update ----- #
 
@@ -174,33 +189,108 @@ def update_order_service(user: User, session: Session, order_id: int, order_upd:
     session.refresh(order)
     
     return order
-    
-# ----- Order delete ----- #
 
-def delete_order_service(user: User, session: Session, order_id: int) -> Order:
-    user_reserved = session.get(User, user.id, with_for_update=True)
-    if user_reserved is None:
-        assert user.id is not None
-        raise ExceptionUserNotFound_404(user.id)
-    
-    # Both seller and buyer can cancel the order
-    query = select(Order).where(Order.id == order_id, or_(Order.buyer_id == user.id, Order.seller_id == user.id), Order.status == OrderStatus.PENDING).with_for_update()
+def approve_order_service(session: Session, order_id: int) -> Order:
+    query = select(Order).where(Order.id == order_id, Order.status == OrderStatus.PENDING).with_for_update()
     order = session.exec(query).first()
+    
     if order is None:
         raise ExceptionOrderNotFound_404(order_id)
     
-    # Delete logic
-    for trans in order.transactions:
-        trans.status = TransactionStatus.FAILED
-    order.item.stock_quantity += order.quantity
-    order.buyer.balance += order.price_per_item * order.quantity
-    order.status = OrderStatus.CANCELLED
+    order.status = OrderStatus.SHIPPED
     
     session.add(order)
     session.commit()
     session.refresh(order)
     
     return order
+
+def complete_order_service(session: Session, order_id: int) -> Order:
+    query = select(Order).where(Order.id == order_id, Order.status == OrderStatus.SHIPPED).with_for_update()
+    order = session.exec(query).first()
+    
+    if order is None:
+        raise ExceptionOrderNotFound_404(order_id)
+    
+    # Completion logic
+    order.status = OrderStatus.DELIVERED
+    order.seller.balance += order.quantity * order.price_per_item
+    
+    for trans in order.transactions:
+        if trans.type == TransactionType.SALE:
+            trans.status = TransactionStatus.SUCCESS
+    
+    session.add(order)
+    session.commit()
+    session.refresh(order)
+    
+    return order
+    
+# ----- Order delete ----- #
+
+def delete_logic(order: Order):
+    for trans in order.transactions:
+        if trans.type == TransactionType.SALE:
+            trans.status = TransactionStatus.FAILED
+            
+    order.item.stock_quantity += order.quantity
+    order.buyer.balance += order.price_per_item * order.quantity
+    order.status = OrderStatus.CANCELLED
+    
+    # Refunds the buyer
+    refund_trans = Transaction(amount=order.price_per_item * order.quantity,
+                               type=TransactionType.REFUND,
+                               order=order,
+                               user=order.buyer,
+                               status=TransactionStatus.SUCCESS)
+    
+    return refund_trans
+    
+
+def delete_order_service(user: User, session: Session, order_id: int) -> Order:
+    user_reserved = session.get(User, user.id, with_for_update=True)
+    # user_reserved can be either seller or buyer here
+    
+    if user_reserved is None:
+        assert user.id is not None
+        raise ExceptionUserNotFound_404(user.id)
+    
+    # Both seller and buyer can cancel the order
+    query = select(Order).where(Order.id == order_id, or_(Order.buyer_id == user_reserved.id, Order.seller_id == user_reserved.id)).with_for_update()
+    order = session.exec(query).first()
+    if order is None:
+        raise ExceptionOrderNotFound_404(order_id)
+    if order.status is not OrderStatus.PENDING:
+        raise ExceptionNotPending_409()
+    
+    # Delete logic
+    refund_trans = delete_logic(order)
+    
+    session.add(order)
+    session.add(refund_trans)
+    session.commit()
+    session.refresh(order)
+    
+    return order
+
+def delete_order_admin_service(session: Session, order_id: int) -> Order:
+    query = select(Order).where(Order.id == order_id).with_for_update()
+    order = session.exec(query).first()
+    if order is None:
+        raise ExceptionOrderNotFound_404(order_id)
+    if order.status is not OrderStatus.PENDING:
+        raise ExceptionNotPending_409()
+    
+    # Delete logic
+    refund_trans = delete_logic(order)
+    
+    session.add(order)
+    session.add(refund_trans)
+    session.commit()
+    session.refresh(order)
+    
+    return order
+    
     
     
     

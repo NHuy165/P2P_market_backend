@@ -96,10 +96,10 @@ class ItemSortFilterBase(BaseModel):
     sorted_ascending: bool = True
     
 class ItemSortFilterPublic(ItemSortFilterBase):
-    sorted_by: ItemAttrSortPublic | None = None    
+    sorted_by: ItemAttrSortPublic = ItemAttrSortPublic.item_id
     
 class ItemSortFilterPrivate(ItemSortFilterBase):
-    sorted_by: ItemAttrSortPrivate | None = None
+    sorted_by: ItemAttrSortPrivate = ItemAttrSortPrivate.item_id
     
     include_active: bool = True
     include_suspended: bool = False

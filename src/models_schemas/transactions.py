@@ -11,6 +11,7 @@ class TransactionType(str, Enum):
     WITHDRAWAL = "WITHDRAWAL"
     SALE = "SALE"
     PURCHASE = "PURCHASE"
+    REFUND = "REFUND"
     
 class TransactionStatus(str, Enum):
     ON_HOLD = "ON_HOLD"
@@ -53,7 +54,7 @@ class TransactionAttrSort(str, Enum):
     transaction_amount = "amount"
     
 
-class TransactionSortFilter(BaseModel):
+class TransactionSearchSortFilter(BaseModel):
     id: int | None = None
     order_id: int | None = None
     user_id: int | None = None
@@ -67,7 +68,17 @@ class TransactionSortFilter(BaseModel):
     created_at_lower: datetime | None = None
     created_at_higher: datetime | None = None
     
-    sorted_by: TransactionAttrSort | None = None
+    include_deposit: bool = True
+    include_withdrawal: bool = True
+    include_sale: bool = True
+    include_purchase: bool = True
+    include_refund: bool = True
+    
+    include_on_hold: bool = True
+    include_success: bool = True
+    include_failed: bool = True
+    
+    sorted_by: TransactionAttrSort = TransactionAttrSort.transaction_id
     sorted_ascending: bool = True
 
 # ----- FILTER ----- #

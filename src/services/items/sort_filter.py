@@ -24,12 +24,11 @@ def item_sort_filter_base(query: SelectOfScalar[Item], sort_filter: ItemSortFilt
 def item_sort_filter_public(query: SelectOfScalar[Item], sort_filter: ItemSortFilterPublic) -> SelectOfScalar[Item]:
     query = item_sort_filter_base(query, sort_filter)
     
-    if sort_filter.sorted_by is not None:
-        att = getattr(Item, sort_filter.sorted_by.value)
-        if sort_filter.sorted_ascending:
-            query = query.order_by(att.asc())
-        else:
-            query = query.order_by(att.desc())
+    att = getattr(Item, sort_filter.sorted_by.value)
+    if sort_filter.sorted_ascending:
+        query = query.order_by(col(att).asc())
+    else:
+        query = query.order_by(col(att).desc())
         
     # Public query will ONLY return active items.
     query = query.where(Item.status is ItemStatus.ACTIVE)
@@ -46,12 +45,11 @@ def item_sort_filter_private(query: SelectOfScalar[Item], sort_filter: ItemSortF
     if sort_filter.include_banned is False:
         query = query.where(Item.status is not ItemStatus.BANNED)
 
-    if sort_filter.sorted_by is not None:
-        att = getattr(Item, sort_filter.sorted_by.value)
-        if sort_filter.sorted_ascending:
-            query = query.order_by(col(att).asc())
-        else:
-            query = query.order_by(col(att).desc())
+    att = getattr(Item, sort_filter.sorted_by.value)
+    if sort_filter.sorted_ascending:
+        query = query.order_by(col(att).asc())
+    else:
+        query = query.order_by(col(att).desc())
         
     return query
     

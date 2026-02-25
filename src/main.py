@@ -26,8 +26,6 @@ app.add_exception_handler(ExceptionCustom, custom_exceptions_handler) # type: ig
 def on_startup():
     create_db_and_tables()
     
-
-
 # ----- Auth ----- #
 
 app.include_router(
@@ -50,45 +48,34 @@ admin_router.include_router(
     tags=["users"],
 )
 
-# ----- Items ----- #
-
-items_errors : dict[int | str, dict[str, Any]] | None = {
-    400: {"description": "Entered both relative and absolute quantity."},
-    404: {"description": "Couldn't find item."},
-    409: {"description": "Overlapping name, negative stock or balance."}
-    }    
+# ----- Items ----- # 
 
 app.include_router(
     items.core.router,
     prefix="/items",
     tags=["items"],
-    responses=items_errors
     )
 
-# ----- Orders ----- #
-orders_errors : dict[int | str, dict[str, Any]] | None = {
-    400: {"description": "Entered both relative and absolute quantity."},
-    404: {"description": "Couldn't find user, item or order with the specified information."},
-    409: {"description": "Buying own items. Negative stock or balance upon ordering. Order update timeout. Order update invalid due to status no longer being pending."}
-    }     
+admin_router.include_router(
+    items.admin.router,
+    prefix="/items",
+    tags=["items"],
+)
+
+# ----- Orders ----- #  
+
 app.include_router(
     orders.core.router,
     prefix="/orders",
     tags=["orders"],
-    responses=orders_errors
     )
 
 # ----- Transactions ----- #
-transactions_errors : dict[int | str, dict[str, Any]] | None = {
-    404: {"description": "User not found."},
-    409: {"description": "Negative balance due to purchase or withdrawal."}
-    }    
 
 app.include_router(
     transactions.core.router,
     prefix="/transactions",
     tags=["transactions"],
-    responses=transactions_errors
     )
 
 # ----- Admin ----- #

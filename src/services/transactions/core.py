@@ -3,7 +3,7 @@ from sqlmodel import select, Session
 from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionUserNotFound_404
 from .sort_filter import transaction_sort_filter
 from ...models_schemas.users import User
-from ...models_schemas.transactions import Transaction, TransactionSortFilter, TransactionStatus, TransactionType, TransactionInput
+from ...models_schemas.transactions import Transaction, TransactionSearchSortFilter, TransactionStatus, TransactionType, TransactionInput
 
 # ----- Transaction create ----- #
 
@@ -40,11 +40,12 @@ def change_money(user: User, session: Session, inp: TransactionInput, trans_type
 
 # ----- Transaction read ----- #
 
-def read_transactions_service(user: User, session: Session, sort_filter: TransactionSortFilter | None = None) -> list:
+def read_transactions_service(user: User, session: Session, sort_filter: TransactionSearchSortFilter | None = None) -> list:
     query = select(Transaction).where(Transaction.user_id == user.id)
     
-    if sort_filter is not None:
-        query = transaction_sort_filter(query, sort_filter)
+    if sort_filter is None:
+        sort_filter = TransactionSearchSortFilter()
+    query = transaction_sort_filter(query, sort_filter)
         
     result = session.exec(query).all()
     return list(result)

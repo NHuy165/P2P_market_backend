@@ -6,7 +6,7 @@ from .get import get_user_service
 from ...models_schemas.orders import Order, OrderStatus
 from ...core.security import get_hashed, verify_hashed
 from ...models_schemas.users import PasswordUpdate, User, UserGet, UserInput, UserStatus, UserUpdate
-from ...models_schemas.exceptions import ExceptionActivationStatus_409, ExceptionAuthentication_401, ExceptionBanStatus_409, ExceptionModifiedAdmin_403, ExceptionUnfinishedOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionUserNotFound_404
+from ...models_schemas.exceptions import ExceptionAuthentication_401, ExceptionModifiedAdmin_403, ExceptionStatusOverlap_409, ExceptionUnfinishedOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionUserNotFound_404
 
 # ----- User create ----- #
 
@@ -97,7 +97,7 @@ def delete_user_service(user: User, session: Session, password: str) -> User:
     
     return user
 
-def change_ban_status_service(session: Session, user_id: int, ban: bool) -> User:
+def change_user_ban_status_service(session: Session, user_id: int, ban: bool) -> User:
     user_get = UserGet(id=user_id, include_banned=True)
     user = get_user_service(session, user_get)
     
@@ -108,7 +108,7 @@ def change_ban_status_service(session: Session, user_id: int, ban: bool) -> User
         raise ExceptionModifiedAdmin_403()
     
     if (user.status is UserStatus.BANNED and ban is True) or (user.status is not UserStatus.BANNED is False and ban is False):
-        raise ExceptionBanStatus_409(banned=user.status is UserStatus.BANNED)
+        raise ExceptionStatusOverlap_409("user")
     
     if user.status is UserStatus.BANNED:
         user.status = UserStatus.ACTIVE

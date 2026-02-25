@@ -64,7 +64,7 @@ class OrderAttrSort(str, Enum):
     order_status = "status"
     order_type = "type"
 
-class OrderSortFilter(BaseModel):
+class OrderSearchSortFilter(BaseModel):
     id: int | None = None
     item_id: int | None = None
     buyer_id: int | None = None
@@ -83,7 +83,12 @@ class OrderSortFilter(BaseModel):
     
     type: bool | None = None # True for sell orders only, False for buy orders only, None for both
     
-    sorted_by: OrderAttrSort | None = None
+    include_pending: bool = True
+    include_cancelled: bool = True
+    include_shipped: bool = True
+    include_delivered: bool = True
+    
+    sorted_by: OrderAttrSort = OrderAttrSort.order_id
     sorted_ascending: bool = True
 
 # ----- UPDATE ----- #
