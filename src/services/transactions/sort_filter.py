@@ -1,3 +1,4 @@
+from sqlmodel import col
 from sqlmodel.sql.expression import SelectOfScalar
 
 from ...models_schemas.transactions import Transaction, TransactionSortFilter
@@ -28,8 +29,9 @@ def transaction_sort_filter(query: SelectOfScalar[Transaction], sort_filter: Tra
     if sort_filter.sorted_by is not None:
         att = getattr(Transaction, sort_filter.sorted_by.value)
         if sort_filter.sorted_ascending:
-            query = query.order_by(att.asc())
+            query = query.order_by(col(att).asc())
         else:
-            query = query.order_by(att.desc())
-            
+            query = query.order_by(col(att).desc())
+    else:
+        query = query.order_by(col(Transaction.id).asc())
     return query

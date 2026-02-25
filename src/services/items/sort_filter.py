@@ -1,3 +1,4 @@
+from sqlmodel import col
 from sqlmodel.sql.expression import SelectOfScalar
 
 from ...models_schemas.items import Item, ItemSortFilterBase, ItemSortFilterPrivate, ItemSortFilterPublic, ItemStatus
@@ -48,9 +49,9 @@ def item_sort_filter_private(query: SelectOfScalar[Item], sort_filter: ItemSortF
     if sort_filter.sorted_by is not None:
         att = getattr(Item, sort_filter.sorted_by.value)
         if sort_filter.sorted_ascending:
-            query = query.order_by(att.asc())
+            query = query.order_by(col(att).asc())
         else:
-            query = query.order_by(att.desc())
+            query = query.order_by(col(att).desc())
         
     return query
     

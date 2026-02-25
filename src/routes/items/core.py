@@ -5,7 +5,7 @@ from src.core.dependencies import UserDep
 
 from ...core.database import SessionDep
 from ...models_schemas.items import ItemInput, ItemOutput, ItemSearch, ItemUpdate, ItemOutputPrivate, ItemSortFilterPrivate, ItemSortFilterPublic
-from ...services.items.core import create_item_service, suspend_items_all_service, read_private_items_all_service, read_private_items_with_sf_service, read_public_items_all_service, read_public_items_with_sf_service, restore_item_service, update_item_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
+from ...services.items.core import create_item_service, suspend_items_all_service, read_private_items_many_service, read_public_items_many_service, restore_item_service, update_item_service, read_private_item_one_service, read_public_item_one_service, delete_item_service
 from ...models_schemas.exceptions import *
 
 router = APIRouter()
@@ -24,24 +24,13 @@ def create_item(user: UserDep, session: SessionDep, item: ItemInput):
                 
 # ----- Item read ----- #
 
-@router.get("/my-items/", response_model=list[ItemOutputPrivate],
-            responses={
-                401: Responses.RESPONSE_401_UNAUTHORIZED,
-                403: Responses.RESPONSE_403_FORBIDDEN,
-            })
-def read_private_items_all(user: UserDep, session: SessionDep):
-    """
-    Read all items, including banned and suspended, excluding deleted, from the current user.
-    """
-    return read_private_items_all_service(user, session)
-
 @router.get("/my-items", response_model=list[ItemOutputPrivate],
             responses={
                 401: Responses.RESPONSE_401_UNAUTHORIZED,
                 403: Responses.RESPONSE_403_FORBIDDEN,
             })
-def read_private_items_with_sf(user: UserDep, session: SessionDep, search: ItemSearch, sort_filter: Annotated[ItemSortFilterPrivate, Query()]):
-    return read_private_items_with_sf_service(user, session, search, sort_filter)
+def read_private_items_many(user: UserDep, session: SessionDep, search: Annotated[ItemSearch, Query()], sort_filter: Annotated[ItemSortFilterPrivate, Query()]):
+    return read_private_items_many_service(user, session, search, sort_filter)
 
 @router.get("/my-items/{item_id}", response_model=ItemOutputPrivate,
             responses={
@@ -54,13 +43,10 @@ def read_private_item_one(user: UserDep, session: SessionDep, item_id: Annotated
 
 # These functions below don't require user to be logged in
 
-@router.get("/", response_model=list[ItemOutput])
-def read_public_items_all(session: SessionDep):
-    return read_public_items_all_service(session)
 
 @router.get("", response_model=list[ItemOutput])
-def read_public_items_with_sf(session: SessionDep, search: ItemSearch, sort_filter: Annotated[ItemSortFilterPublic, Query()]):
-    return read_public_items_with_sf_service(session, search, sort_filter)
+def read_public_items_many(session: SessionDep, search: Annotated[ItemSearch, Query()], sort_filter: Annotated[ItemSortFilterPublic, Query()]):
+    return read_public_items_many_service(session, search, sort_filter)
 
 @router.get("/{item_id}", response_model=ItemOutput,
             responses={
