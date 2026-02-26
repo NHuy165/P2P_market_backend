@@ -4,19 +4,22 @@ from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import datetime, timezone
 
-# ----- BASE ----- #
-
 class TransactionType(str, Enum):
     DEPOSIT = "DEPOSIT"
     WITHDRAWAL = "WITHDRAWAL"
     SALE = "SALE"
     PURCHASE = "PURCHASE"
     REFUND = "REFUND"
+    ADMIN_ADD = "ADMIN_ADD"
+    ADMIN_SUBTRACT = "ADMIN_SUBTRACT"
     
 class TransactionStatus(str, Enum):
     ON_HOLD = "ON_HOLD"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
+    
+    
+# ----- BASE ----- #
 
 class TransactionBase(SQLModel):
     amount: Annotated[float, Field(gt=0)]
@@ -38,6 +41,7 @@ class TransactionOutput(TransactionBase):
     type: TransactionType
     user_id: int
     created_at: datetime
+    finished_at: datetime | None
     status: TransactionStatus
     
 # ----- SORT AND FILTER ----- #
@@ -51,6 +55,7 @@ class TransactionAttrSort(str, Enum):
     transaction_status = "status"
     
     transaction_created_at = "created_at"
+    transaction_finished_at = "finished_at"
     transaction_amount = "amount"
     
 
@@ -68,11 +73,16 @@ class TransactionSearchSortFilter(BaseModel):
     created_at_lower: datetime | None = None
     created_at_higher: datetime | None = None
     
+    finished_at_lower: datetime | None = None
+    finished_at_higher: datetime | None = None
+    
     include_deposit: bool = True
     include_withdrawal: bool = True
     include_sale: bool = True
     include_purchase: bool = True
     include_refund: bool = True
+    include_admin_add: bool = True
+    include_admin_subtract: bool = True
     
     include_on_hold: bool = True
     include_success: bool = True
@@ -100,6 +110,7 @@ class Transaction(TransactionBase, table=True):
     type: TransactionType
     status: TransactionStatus
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    finished_at: datetime | None = None
     
     user: "User" = Relationship(back_populates="transactions")
     order: "Order | None" = Relationship(back_populates="transactions")

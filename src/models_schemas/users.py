@@ -4,6 +4,11 @@ from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime, timezone
 from enum import Enum
 
+class UserStatus(Enum):
+    ACTIVE = "ACTIVE"
+    BANNED = "BANNED"
+    DELETED = "DELETED"
+    
 # ----- BASE ----- #
 
 class UserBase(SQLModel):
@@ -18,20 +23,18 @@ class UserInput(UserBase):
     password: Annotated[str, Field(min_length=8)]
     
 # ----- OUTPUT PUBLIC ----- #
-    
+
 # User profile shown to normal users
 class UserOutput(UserBase):
     id: int
     
+    status: UserStatus
+    
     created_at: datetime
+    banned_at: datetime | None
     
 # ----- OUTPUT PRIVATE ----- #
 
-class UserStatus(Enum):
-    ACTIVE = "ACTIVE"
-    BANNED = "BANNED"
-    DELETED = "DELETED"
-    
 from .items import ItemOutput
 from .orders import OrderOutput
 from .transactions import TransactionOutput
@@ -42,7 +45,7 @@ class UserOutputPrivate(UserOutput):
     balance: float
     
     is_active: bool
-    status: UserStatus
+    
     
     items: list[ItemOutput]
     
@@ -96,6 +99,8 @@ class User(UserBase, table=True):
     balance: float = 0
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    deleted_at: datetime | None = None
+    banned_at: datetime | None = None
     
     is_admin: bool = False
     status: UserStatus = UserStatus.ACTIVE

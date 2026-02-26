@@ -26,6 +26,11 @@ def order_sort_filter(query: SelectOfScalar[Order], sort_filter: OrderSearchSort
     if sort_filter.created_at_higher is not None:
         query = query.where(Order.created_at <= sort_filter.created_at_higher)
         
+    if sort_filter.finished_at_lower is not None:
+        query = query.where(Order.finished_at != None).where(Order.finished_at >= sort_filter.finished_at_lower) # type: ignore
+    if sort_filter.finished_at_higher is not None:
+        query = query.where(Order.finished_at != None).where(Order.finished_at <= sort_filter.finished_at_higher) # type: ignore
+        
     if sort_filter.price_per_item_lower is not None:
         query = query.where(Order.price_per_item >= sort_filter.price_per_item_lower)
     if sort_filter.price_per_item_higher is not None:

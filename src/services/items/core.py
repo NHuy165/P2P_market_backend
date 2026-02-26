@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
+
 from sqlmodel import Session
 
 from src.services.users.get import get_user_service
 
-from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionItemNotFound_404, ExceptionStatusOverlap_409, ExceptionTakenItemName_409, ExceptionUserNotFound_404
+from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionStatusOverlap_409, ExceptionTakenItemName_409, ExceptionNotFound_404, ObjectType
 from ...models_schemas.users import User, UserGet
 from ...models_schemas.items import Item, ItemInput, ItemStatus, ItemUpdate, ItemSearch, ItemSortFilterPublic, ItemSortFilterPrivate
 from .get import get_items, get_items
@@ -41,7 +43,7 @@ def read_private_items_many_admin_service(session: Session, user_id: int, search
     user = get_user_service(session, user_get)
     
     if user is None:
-        raise ExceptionUserNotFound_404(user_id)
+        raise ExceptionNotFound_404(ObjectType.USER, user_id)
 
     return read_private_items_many_service(user, session, search, sort_filter=sort_filter)
 
@@ -52,7 +54,7 @@ def read_private_item_one_service(user: User, session: Session, item_id: int) ->
     result = get_items(session, many=False, search=search, sf_private=sort_filter)
     
     if result is None:
-        raise ExceptionItemNotFound_404(item_id)
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
     
     return result # type: ignore
 
@@ -66,7 +68,7 @@ def read_private_item_one_admin_service(session: Session, item_id: int) -> Item 
     result = get_items(session, many=False, search=search, sf_private=sort_filter)
     
     if result is None:
-        raise ExceptionItemNotFound_404(item_id)
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
     
     return result # type: ignore
 
@@ -87,7 +89,7 @@ def read_public_item_one_service(session: Session, item_id: int) -> Item | None:
     result = get_items(session, many=False, search=search, sf_public=sort_filter)
     
     if result is None:
-        raise ExceptionItemNotFound_404(item_id)
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
     
     return result # type: ignore
 
@@ -100,7 +102,7 @@ def update_item_service(user: User, session: Session, item_id: int, item_update:
     item = get_items(session, many=False, search=search, sf_private=sort_filter, with_for_update=True)
     
     if item is None:
-        raise ExceptionItemNotFound_404(item_id)
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
     assert isinstance(item, Item)
     
     # Negative relative quantity
@@ -109,7 +111,7 @@ def update_item_service(user: User, session: Session, item_id: int, item_update:
     
     # Activate/suspend overlap
     if item_update.status == item.status:
-        raise ExceptionStatusOverlap_409("item")
+        raise ExceptionStatusOverlap_409(ObjectType.ITEM)
     
     # Actual update code
     update_data = item_update.model_dump(exclude_unset=True)
@@ -152,11 +154,12 @@ def delete_item_service(user: User, session: Session, item_id: int) -> Item:
     item = get_items(session, many=False, search=search, sf_private=sort_filter, with_for_update=True)
     
     if item is None:
-        raise ExceptionItemNotFound_404(item_id)
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
     assert isinstance(item, Item)
     
     # Soft delete so pending orders still have to get delivered.
     item.status = ItemStatus.DELETED
+    item.deleted_at = datetime.now(timezone.utc)
     
     session.add(item)
     session.commit()
@@ -175,6 +178,7 @@ def delete_items_all_service(user: User, session: Session) -> list[Item]:
     
     for item in items:
         item.status = ItemStatus.DELETED
+        item.deleted_at = datetime.now(timezone.utc)
         
     session.add_all(items)
     session.commit()
@@ -191,15 +195,17 @@ def change_item_ban_status_service(session: Session, item_id: int, ban: bool) ->
     assert not isinstance(item, list)
     
     if item is None:
-        raise ExceptionItemNotFound_404(item_id)
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
     
     if (item.status is ItemStatus.BANNED and ban is True) or (item.status is not ItemStatus.BANNED and ban is False):
-        raise ExceptionStatusOverlap_409("item")
+        raise ExceptionStatusOverlap_409(ObjectType.ITEM)
     
     if item.status is ItemStatus.BANNED:
         item.status = ItemStatus.SUSPENDED
+        item.banned_at = None
     else:
         item.status = ItemStatus.BANNED
+        item.banned_at = datetime.now(timezone.utc)
     
     session.add(item)
     session.commit()

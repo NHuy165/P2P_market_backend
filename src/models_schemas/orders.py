@@ -40,7 +40,8 @@ class OrderOutputNoRelationship(OrderBase):
     
     status: OrderStatus
     created_at: datetime
-
+    finished_at: datetime | None # Whether failed or delivered
+    
 class OrderOutputNoType(OrderOutputNoRelationship):  
     item: ItemOutput
     buyer: UserOutput
@@ -60,6 +61,7 @@ class OrderAttrSort(str, Enum):
     order_quantity = "quantity"
     
     order_created_at = "created_at"
+    order_finished_at = "finished_at"
     order_price_per_item = "price_per_item"
     order_status = "status"
     order_type = "type"
@@ -77,6 +79,9 @@ class OrderSearchSortFilter(BaseModel):
     
     created_at_lower: datetime | None = None
     created_at_higher: datetime | None = None
+    
+    finished_at_lower: datetime | None = None
+    finished_at_higher: datetime | None = None
     
     price_per_item_lower: float | None = None
     price_per_item_higher: float | None = None
@@ -113,6 +118,7 @@ class Order(OrderBase, table=True):
     # No transaction foreign key. 
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    finished_at: datetime | None = None
     price_per_item: Annotated[float, Field(gt=0)] # Prevents price changes
     status: OrderStatus = OrderStatus.PENDING
 

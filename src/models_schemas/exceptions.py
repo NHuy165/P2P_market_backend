@@ -115,18 +115,14 @@ class ExceptionModifiedAdmin_403(ExceptionCustom):
         
 # ----- 404 ----- #
 
-class ExceptionUserNotFound_404(ExceptionCustom):
-    def __init__(self, user_id: int):
-        super().__init__(404, ExceptionType.USER_NOT_FOUND, f"Could not find a user with an ID of {user_id} under the predefined conditions.")
+class ObjectType(str, Enum):
+    ITEM = "item"
+    ORDER = "order"
+    USER = "user"
 
-class ExceptionItemNotFound_404(ExceptionCustom):
-    def __init__(self, item_id: int):
-        super().__init__(404, ExceptionType.ITEM_NOT_FOUND, f"Could not find a valid item with an ID of {item_id} under the predefined conditions.")
-        
-class ExceptionOrderNotFound_404(ExceptionCustom):
-    def __init__(self, order_id: int):
-        super().__init__(404, ExceptionType.ORDER_NOT_FOUND, f"Could not find a valid order with an ID of {order_id} under the predefined conditions.")
-    
+class ExceptionNotFound_404(ExceptionCustom):
+    def __init__(self, obj: ObjectType, id: int):
+        super().__init__(404, ExceptionType.USER_NOT_FOUND, f"Could not find any {obj.value} with an ID of {id} under the predefined conditions.")
 
 # ----- 409 ----- #
 
@@ -147,7 +143,7 @@ class ExceptionUnfinishedOrders_409(ExceptionCustom):
         super().__init__(409, ExceptionType.UNFINISHED_ORDERS, "Your account still has unfinished orders.")
 
 class ExceptionStatusOverlap_409(ExceptionCustom):
-    def __init__(self, obj: str):
+    def __init__(self, obj: ObjectType):
         super().__init__(409, ExceptionType.STATUS_OVERLAP, f"This {obj} already has the desired state.")
 
 class ExceptionInvalidValue_409(ExceptionCustom):

@@ -50,7 +50,8 @@ class ItemOutput(ItemOutputNoRelationship):
 from .orders import OrderOutputNoType
 class ItemOutputPrivate(ItemOutput):
     status: ItemStatus
-    deleted_at: datetime | None = None
+    
+    banned_at: datetime | None
     
     orders: list[OrderOutputNoType]
     
@@ -130,6 +131,7 @@ class Item(ItemBase, table=True):
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deleted_at: datetime | None = None
+    banned_at: datetime | None = None
     
     status: ItemStatus
     

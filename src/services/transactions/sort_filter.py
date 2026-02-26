@@ -26,6 +26,11 @@ def transaction_sort_filter(query: SelectOfScalar[Transaction], sort_filter: Tra
     if sort_filter.created_at_higher is not None:
         query = query.where(Transaction.created_at <= sort_filter.created_at_higher)
         
+    if sort_filter.finished_at_lower is not None:
+        query = query.where(Transaction.finished_at != None).where(Transaction.finished_at >= sort_filter.finished_at_lower) # type: ignore
+    if sort_filter.finished_at_higher is not None:
+        query = query.where(Transaction.finished_at != None).where(Transaction.finished_at <= sort_filter.finished_at_higher) # type: ignore
+        
     if sort_filter.include_deposit is False:
         query = query.where(Transaction.type is not TransactionType.DEPOSIT)
     if sort_filter.include_withdrawal is False:
@@ -34,8 +39,12 @@ def transaction_sort_filter(query: SelectOfScalar[Transaction], sort_filter: Tra
         query = query.where(Transaction.type is not TransactionType.SALE)
     if sort_filter.include_purchase is False:
         query = query.where(Transaction.type is not TransactionType.PURCHASE)
-    if sort_filter.include_purchase is False:
+    if sort_filter.include_refund is False:
         query = query.where(Transaction.type is not TransactionType.REFUND)
+    if sort_filter.include_admin_add is False:
+        query = query.where(Transaction.type is not TransactionType.ADMIN_ADD)
+    if sort_filter.include_admin_subtract is False:
+        query = query.where(Transaction.type is not TransactionType.ADMIN_SUBTRACT)
         
     if sort_filter.include_on_hold is False:
         query = query.where(Transaction.status is not TransactionStatus.ON_HOLD)

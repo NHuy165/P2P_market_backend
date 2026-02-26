@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from pydantic import EmailStr
 from sqlmodel import Session, or_, select
 
@@ -6,7 +8,7 @@ from .get import get_user_service
 from ...models_schemas.orders import Order, OrderStatus
 from ...core.security import get_hashed, verify_hashed
 from ...models_schemas.users import PasswordUpdate, User, UserGet, UserInput, UserStatus, UserUpdate
-from ...models_schemas.exceptions import ExceptionAuthentication_401, ExceptionModifiedAdmin_403, ExceptionStatusOverlap_409, ExceptionUnfinishedOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionUserNotFound_404
+from ...models_schemas.exceptions import ExceptionAuthentication_401, ExceptionModifiedAdmin_403, ExceptionStatusOverlap_409, ExceptionUnfinishedOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionNotFound_404, ObjectType
 
 # ----- User create ----- #
 
@@ -45,7 +47,7 @@ def read_user_service(session: Session, user_id: int) -> User:
     user = get_user_service(session, user_get)
     
     if user is None:
-        raise ExceptionUserNotFound_404(user_id)
+        raise ExceptionNotFound_404(ObjectType.USER, user_id)
     
     return user
 
@@ -90,6 +92,7 @@ def delete_user_service(user: User, session: Session, password: str) -> User:
     delete_items_all_service(user, session)
 
     user.status = UserStatus.DELETED
+    user.deleted_at = datetime.now(timezone.utc)
     
     session.add(user)
     session.commit()
@@ -102,20 +105,22 @@ def change_user_ban_status_service(session: Session, user_id: int, ban: bool) ->
     user = get_user_service(session, user_get)
     
     if user is None:
-        raise ExceptionUserNotFound_404(user_id)
+        raise ExceptionNotFound_404(ObjectType.USER, user_id)
     
     if user.is_admin:
         raise ExceptionModifiedAdmin_403()
     
     if (user.status is UserStatus.BANNED and ban is True) or (user.status is not UserStatus.BANNED is False and ban is False):
-        raise ExceptionStatusOverlap_409("user")
+        raise ExceptionStatusOverlap_409(ObjectType.USER)
     
     if user.status is UserStatus.BANNED:
         user.status = UserStatus.ACTIVE
+        user.banned_at = None
         # User has to manually reactivate his items here...
         
     else:   
         user.status = UserStatus.BANNED
+        user.banned_at = datetime.now(timezone.utc)
         suspend_items_all_service(user, session)
     
     session.add(user)
