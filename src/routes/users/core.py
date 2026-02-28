@@ -1,12 +1,11 @@
-from fastapi import APIRouter, Body, Depends, status, HTTPException
+from fastapi import APIRouter, Body, status
 from typing import Annotated
 
-from src.core.dependencies import UserDep
-
+from ...core.dependencies import UserDep
 from ...core.database import SessionDep
-from ...services.users.core import delete_user_service, register_user_service, read_user_service, update_account_service
+from ...services.users import delete_user_service, register_user_service, read_user_service, update_account_service
 from ...models_schemas.users import UserInput, UserOutput, UserOutputPrivate, UserUpdate
-from ...models_schemas.exceptions import *
+from ...exceptions.core import *
 
 router = APIRouter()
 

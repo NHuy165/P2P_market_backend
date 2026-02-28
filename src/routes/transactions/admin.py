@@ -1,13 +1,10 @@
-
-from typing import Annotated
-
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 
 from src.core.database import SessionDep
-from src.models_schemas.exceptions import Responses
-from src.models_schemas.transactions import TransactionInput, TransactionOutput, TransactionSearchSortFilter, TransactionType
-from src.services.transactions.core import change_money_admin, read_transactions_admin_service
-
+from src.exceptions.core import Responses
+from src.models_schemas.transactions import TransactionInput, TransactionOutput, TransactionType
+from src.repository.core import CriterionInput
+from src.services.transactions import change_money_admin, read_transactions_admin_service
 
 router = APIRouter()
 
@@ -30,10 +27,10 @@ def subtract_money(session: SessionDep, user_id: int, inp: TransactionInput):
 
 # ----- Transaction read (ADMIN) ----- #
 
-router.get("/{user_id}", response_model=list[TransactionOutput],
+router.post("/{user_id}", response_model=list[TransactionOutput],
            responses={
                404: Responses.RESPONSE_404_NOT_FOUND
            })
-def read_transactions_admin(session: SessionDep, user_id: int, sort_filter: Annotated[TransactionSearchSortFilter, Query()]):
-    return read_transactions_admin_service(session, user_id, sort_filter)
+def read_transactions_admin(session: SessionDep, user_id: int, criteria: list[CriterionInput] = []):
+    return read_transactions_admin_service(session, user_id, criteria)
     

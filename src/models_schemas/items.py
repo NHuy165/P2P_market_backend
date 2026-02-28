@@ -4,6 +4,10 @@ from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime, timezone
 from enum import Enum
 
+if TYPE_CHECKING:
+    from .users import User, UserOutput
+    from .orders import Order, OrderOutputNoType
+
 # ----- BASE ----- #
 
 class ItemBase(SQLModel):
@@ -39,21 +43,20 @@ class ItemOutputNoRelationship(ItemBase):
     created_at: datetime
     
 # Item shown to normal users    
-from .users import UserOutput
 
 class ItemOutput(ItemOutputNoRelationship):
-    seller: UserOutput
+    seller: "UserOutput"
     
 # ----- OUTPUT PRIVATE ----- #
 
 # Item shown to account owner and admins
-from .orders import OrderOutputNoType
+
 class ItemOutputPrivate(ItemOutput):
     status: ItemStatus
     
     banned_at: datetime | None
     
-    orders: list[OrderOutputNoType]
+    orders: list["OrderOutputNoType"]
     
 # ----- SEARCH ----- #
 
@@ -120,10 +123,6 @@ class ItemUpdate(ItemBase):
 
 # ----- DATABASE ----- #
     
-if TYPE_CHECKING:
-    from .users import User
-    from .orders import Order
-
 # Item in database
 class Item(ItemBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None

@@ -1,14 +1,14 @@
-from sqlmodel import Session, or_, select
-from datetime import datetime, timezone, timedelta
+from sqlmodel import Session
+from datetime import datetime, timezone
 
-from src.services.users.get import get_user_service
-
-from ...models_schemas.exceptions import ExceptionInvalidValue_409, ExceptionNotPending_409, ExceptionSelfOwned_409, ExceptionTimeout_409, ExceptionNotFound_404, ObjectType
-from .sort_filter import order_sort_filter
-from ...models_schemas.items import Item
-from ...models_schemas.orders import Order, OrderInput, OrderOutput, OrderSearchSortFilter, OrderUpdate, OrderStatus
-from ...models_schemas.users import User, UserGet
-from ...models_schemas.transactions import Transaction, TransactionType, TransactionStatus
+from ..repository.core import CriterionInput
+from ..repository.items import GetItem
+from ..repository.orders import GetOrder
+from ..repository.users import GetUser
+from ..exceptions.core import ExceptionInvalidValue_409, ExceptionNotPending_409, ExceptionSelfOwned_409, ExceptionNotFound_404, ObjectType
+from ..models_schemas.orders import Order, OrderInput, OrderOutput, OrderStatus
+from ..models_schemas.users import User
+from ..models_schemas.transactions import Transaction, TransactionType, TransactionStatus
 
 
 # ----- Order create ----- #
@@ -18,28 +18,36 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     Creates an order and its transaction.
     Money is subtracted from the buyer and only gets transfered to the buyer on order completion (DELIVERED status).
     """
-    user_reserved = session.get(User, user.id, with_for_update=True)
-    if user_reserved is None:
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("id", user.id)
+    
+    user_wfu = get_user.get_one(session, with_for_update=True)
+    if user_wfu is None:
         assert user.id is not None
         raise ExceptionNotFound_404(ObjectType.USER, user.id)
     
-    item = session.get(Item, order_inp.item_id, with_for_update=True)
+    get_item = GetItem()
+    get_item.base_public()
+    get_item.get_by("id", order_inp.item_id)
+    
+    item = get_item.get_one(session, with_for_update=True)
     if item is None:
         raise ExceptionNotFound_404(ObjectType.ITEM, order_inp.item_id)
     
-    if user_reserved.id == item.seller_id:
+    if user_wfu.id == item.seller_id:
         raise ExceptionSelfOwned_409("Buying item")
     
     if item.stock_quantity < order_inp.quantity:
         raise ExceptionInvalidValue_409("Item stock quantity", item.stock_quantity - order_inp.quantity)
     
     total_amount = order_inp.quantity * item.price
-    if total_amount > user_reserved.balance:
-        raise ExceptionInvalidValue_409("Account balance", user_reserved.balance - total_amount)
+    if total_amount > user_wfu.balance:
+        raise ExceptionInvalidValue_409("Account balance", user_wfu.balance - total_amount)
     
     # Subtracting item stock quantity and buyer's balance
     item.stock_quantity -= order_inp.quantity
-    user_reserved.balance -= order_inp.quantity * item.price
+    user_wfu.balance -= order_inp.quantity * item.price
     # Seller's balance is only updated when order's status is delivered
     
     # Creating order
@@ -48,13 +56,13 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     
     order.item = item # This is technically redundant.
     order.seller = item.seller
-    order.buyer = user_reserved
+    order.buyer = user_wfu
     
     # Buyer spends money right away.
     trans_buyer = Transaction(amount=total_amount,
                         type=TransactionType.PURCHASE,
                         order=order,
-                        user=user_reserved,
+                        user=user_wfu,
                         finished_at=datetime.now(timezone.utc),
                         status=TransactionStatus.SUCCESS)
     
@@ -68,7 +76,7 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     session.add(trans_buyer)
     session.add(trans_seller)
     session.add(order)
-    session.add(user_reserved)
+    session.add(user_wfu)
     session.add(item)
     session.commit()
     session.refresh(order)
@@ -77,41 +85,35 @@ def create_order_service(user: User, session: Session, order_inp: OrderInput) ->
     
 # ----- Order read ----- #
 
-def read_orders_services(user: User, session: Session, sort_filter: OrderSearchSortFilter | None = None) -> list[OrderOutput]:
-    query = select(Order)
+def read_orders_services(user: User, session: Session, type: bool | None = None, criteria: list[CriterionInput] = []) -> list[OrderOutput]:
+    """
+    type: True for sell orders, False for buy orders, None for both
+    """
+    get_order = GetOrder()
     
-    if sort_filter is not None:
-        query = order_sort_filter(query, sort_filter)
+    assert user.id is not None
+    if type is True:
+        get_order.base_sell(user.id)
+    elif type is False:
+        get_order.base_buy(user.id)
+    else:
+        get_order.base_both(user.id)
         
-        # Only gets sell orders and labels them.
-        if sort_filter.type is True: 
-            query = query.where(Order.seller_id == user.id)
-            result = [OrderOutput.model_validate(ord, update={"type": "SELL"}) for ord in session.exec(query).all()]
-            
-        # Only gets buy orders and labels them.
-        elif sort_filter.type is False:
-            query = query.where(Order.buyer_id == user.id)
-            result = [OrderOutput.model_validate(ord, update={"type": "BUY"}) for ord in session.exec(query).all()]
-
-    # Gets both types of orders and labels accordingly.
-    if sort_filter is None or sort_filter.type is None:
-        query = query.where(or_(Order.seller_id == user.id, Order.buyer_id == user.id))
-        sort_filter = OrderSearchSortFilter()
-        query = order_sort_filter(query, sort_filter)
-        result = [OrderOutput.model_validate(ord, update={"type": "SELL" if ord.seller_id == user.id else "BUY"}) for ord in session.exec(query).all()]
+    orders = get_order.get_many_labeled(session, criteria)
     
-    return result
+    return orders
 
-def read_orders_admin_service(session: Session, user_id: int, sort_filter: OrderSearchSortFilter | None = None) -> list[OrderOutput]:
-    user_get = UserGet(id=user_id,
-                       include_banned=True,
-                       include_deleted=True)
-    user = get_user_service(session, user_get)
+def read_orders_admin_service(session: Session, user_id: int, type: bool | None = None, criteria: list[CriterionInput] = []) -> list[OrderOutput]:
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("id", user_id)
+    
+    user = get_user.get_one(session)
     
     if user is None:
         raise ExceptionNotFound_404(ObjectType.USER, user_id)
     
-    return read_orders_services(user, session, sort_filter)
+    return read_orders_services(user, session, type, criteria)
 
 # ----- Order update ----- #
 
@@ -120,12 +122,12 @@ def read_orders_admin_service(session: Session, user_id: int, sort_filter: Order
 #     Allows users to change their order within 10 minutes of order creation, order is still pending, using new item price.
 #     """
     
-#     user_reserved = session.get(User, user.id, with_for_update=True)
-#     if user_reserved is None:
+#     user_wfu = session.get(User, user.id, with_for_update=True)
+#     if user_wfu is None:
 #         assert user.id is not None
 #         raise ExceptionNotFound_404(ObjectType.USER, user.id)
     
-#     query = select(Order).where(Order.id == order_id, Order.buyer_id == user_reserved.id).with_for_update()
+#     query = select(Order).where(Order.id == order_id, Order.buyer_id == user_wfu.id).with_for_update()
 #     order = session.exec(query).first()
 #     if order is None:
 #         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
@@ -155,7 +157,7 @@ def read_orders_admin_service(session: Session, user_id: int, sort_filter: Order
 #         raise ExceptionInvalidValue_409("Item stock quantity", item.stock_quantity + order.quantity - update_contents["quantity"])
     
 #     # Edited content results in insufficient funds from buyer.
-#     old_balance = user_reserved.balance
+#     old_balance = user_wfu.balance
 #     refund = order.price_per_item * order.quantity
 #     new_cost = update_contents["quantity"] * item.price
 #     new_balance = old_balance + refund - new_cost
@@ -168,7 +170,7 @@ def read_orders_admin_service(session: Session, user_id: int, sort_filter: Order
 #     # If new order costs more, this number is negative
     
 #     # User update
-#     user_reserved.balance += money_change
+#     user_wfu.balance += money_change
     
 #     # Transactions update
 #     for trans in order.transactions:
@@ -181,7 +183,7 @@ def read_orders_admin_service(session: Session, user_id: int, sort_filter: Order
 #     order.quantity = update_contents["quantity"]
 #     order.price_per_item = item.price
     
-#     session.add(user_reserved)
+#     session.add(user_wfu)
 #     session.add(order.transactions)
 #     session.add(item)
 #     session.add(order)
@@ -194,8 +196,12 @@ def read_orders_admin_service(session: Session, user_id: int, sort_filter: Order
 # Deprecated function because it's kind of weird.
 
 def approve_order_service(session: Session, order_id: int) -> Order:
-    query = select(Order).where(Order.id == order_id, Order.status == OrderStatus.PENDING).with_for_update()
-    order = session.exec(query).first()
+    get_order = GetOrder()
+    get_order.base_none()
+    get_order.get_by("id", order_id)
+    get_order.get_by("status", OrderStatus.PENDING)
+    
+    order = get_order.get_one(session, with_for_update=True)
     
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
@@ -209,8 +215,12 @@ def approve_order_service(session: Session, order_id: int) -> Order:
     return order
 
 def complete_order_service(session: Session, order_id: int) -> Order:
-    query = select(Order).where(Order.id == order_id, Order.status == OrderStatus.SHIPPED).with_for_update()
-    order = session.exec(query).first()
+    get_order = GetOrder()
+    get_order.base_none()
+    get_order.get_by("id", order_id)
+    get_order.get_by("status", OrderStatus.SHIPPED)
+    
+    order = get_order.get_one(session, with_for_update=True)
     
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
@@ -255,16 +265,26 @@ def delete_logic(order: Order):
     
 
 def delete_order_service(user: User, session: Session, order_id: int) -> Order:
-    user_reserved = session.get(User, user.id, with_for_update=True)
-    # user_reserved can be either seller or buyer here
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("id", user.id)
     
-    if user_reserved is None:
+    user_wfu = get_user.get_one(session, with_for_update=True)
+    
+    # user_wfu can be either seller or buyer here
+    
+    if user_wfu is None:
         assert user.id is not None
         raise ExceptionNotFound_404(ObjectType.USER, user.id)
     
     # Both seller and buyer can cancel the order
-    query = select(Order).where(Order.id == order_id, or_(Order.buyer_id == user_reserved.id, Order.seller_id == user_reserved.id)).with_for_update()
-    order = session.exec(query).first()
+    assert user_wfu.id is not None
+    get_order = GetOrder()
+    get_order.base_both(user_wfu.id)
+    get_order.get_by("id", order_id)
+    
+    order = get_order.get_one(session, with_for_update=True)
+    
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
     if order.status is not OrderStatus.PENDING:
@@ -281,8 +301,12 @@ def delete_order_service(user: User, session: Session, order_id: int) -> Order:
     return order
 
 def delete_order_admin_service(session: Session, order_id: int) -> Order:
-    query = select(Order).where(Order.id == order_id).with_for_update()
-    order = session.exec(query).first()
+    get_order = GetOrder()
+    get_order.base_none()
+    get_order.get_by("id", order_id)
+    
+    order = get_order.get_one(session, with_for_update=True)
+    
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
     if order.status is not OrderStatus.PENDING:

@@ -1,0 +1,226 @@
+from datetime import datetime, timezone
+
+from sqlmodel import Session
+
+from ..repository.core import CompareOperator, CriterionGet, CriterionInput
+from ..repository.items import GetItem
+from ..repository.users import GetUser
+from ..exceptions.core import ExceptionInvalidValue_409, ExceptionStatusOverlap_409, ExceptionTakenItemName_409, ExceptionNotFound_404, ObjectType
+from ..models_schemas.users import User
+from ..models_schemas.items import Item, ItemInput, ItemStatus, ItemUpdate
+
+# ----- Item create ----- #
+
+def create_item_service(user: User, session: Session, item: ItemInput) -> Item:
+    # Checks for overlapping names
+    get_item = GetItem()
+    get_item.base_private()
+    get_item.get_by("seller_id", user.id)
+    get_item.get_by("name", item.name)
+    
+    existing = get_item.get_one(session)
+    
+    if existing is not None:
+        raise ExceptionTakenItemName_409()
+    
+    listing = Item(**item.model_dump(), seller=user)
+    
+    session.add(listing)
+    session.commit()
+    session.refresh(listing)
+    
+    return listing
+
+# ----- Item read ----- #
+
+def read_private_items_many_service(user: User, session: Session, criteria: list[CriterionInput] = []) -> list[Item]:
+    get_item = GetItem()
+    get_item.base_private()
+    get_item.get_by("seller_id", user.id)
+    
+    items = get_item.get_many(session, criteria)
+    return items
+
+def read_private_items_many_admin_service(session: Session, user_id: int, criteria: list[CriterionInput] = []) -> list[Item]:
+    user_get = GetUser()
+    user_get.base_all()
+    user_get.get_by("id", user_id)
+    
+    user = user_get.get_one(session)
+    
+    if user is None:
+        raise ExceptionNotFound_404(ObjectType.USER, user_id)
+
+    return read_private_items_many_service(user, session, criteria)
+
+def read_private_item_one_service(user: User, session: Session, item_id: int) -> Item | None:
+    get_item = GetItem()
+    get_item.base_private()
+    get_item.get_by("seller_id", user.id)
+    get_item.get_by("id", item_id)
+
+    item = get_item.get_one(session)
+    
+    if item is None:
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+    
+    return item
+
+def read_private_item_one_admin_service(session: Session, item_id: int) -> Item | None:
+    get_item = GetItem()
+    get_item.base_private()
+    get_item.get_by("id", item_id)
+
+    item = get_item.get_one(session)
+    
+    if item is None:
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+    
+    return item
+
+def read_public_items_many_service(session: Session, criteria: list[CriterionInput] = []) -> list[Item]:
+    get_item = GetItem()
+    get_item.base_public()
+    
+    items = get_item.get_many(session, criteria)
+    return items
+
+def read_public_item_one_service(session: Session, item_id: int) -> Item | None:
+    get_item = GetItem()
+    get_item.base_public()
+    get_item.get_by("id", item_id)
+    
+    item = get_item.get_one(session)
+    
+    if item is None:
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+    
+    return item
+
+# ----- Item update ----- #
+
+def update_item_service(user: User, session: Session, item_id: int, item_update: ItemUpdate) -> Item:
+    # Cannot edit banned and deleted items.
+    get_item = GetItem()
+    not_banned = CriterionGet("status", ItemStatus.BANNED, CompareOperator.NE)
+    not_deleted = CriterionGet("status", ItemStatus.DELETED, CompareOperator.NE)
+    get_item.base_custom(criteria=[not_banned, not_deleted])
+    get_item.get_by("seller_id", user.id)
+    get_item.get_by("id", item_id)
+    
+    item = get_item.get_one(session, with_for_update=True)
+    
+    if item is None:
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+    
+    # Negative relative quantity
+    if item_update.stock_quantity_relative is not None and item_update.stock_quantity_relative + item.stock_quantity < 0:
+        raise ExceptionInvalidValue_409("Item stock quantity", item_update.stock_quantity_relative + item.stock_quantity)
+    
+    # Activate/suspend overlap
+    if item_update.status == item.status:
+        raise ExceptionStatusOverlap_409(ObjectType.ITEM)
+    
+    # Actual update code
+    update_data = item_update.model_dump(exclude_unset=True)
+    
+    if item_update.stock_quantity_relative is not None:
+        update_data["stock_quantity"] = item.stock_quantity + item_update.stock_quantity_relative
+
+    item.sqlmodel_update(update_data)
+    
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    
+    return item
+
+# Used for when you want to delete your account
+def suspend_items_all_service(user: User, session: Session) -> list[Item]:
+    get_item = GetItem()
+    get_item.base_public() # Only fetches active items
+    get_item.get_by("seller_id", user.id)
+    
+    items = get_item.get_many(session, with_for_update=True)
+    
+    for item in items:
+        item.status = ItemStatus.SUSPENDED
+        
+    session.add_all(items)
+    session.commit()
+    
+    for item in items:
+        session.refresh(item)
+    
+    return items
+
+# ----- Item delete ----- #
+
+def delete_item_service(user: User, session: Session, item_id: int) -> Item:
+    get_item = GetItem()
+    get_item.base_private()
+    get_item.get_by("seller_id", user.id)
+    get_item.get_by("id", item_id)
+    
+    item = get_item.get_one(session, with_for_update=True)
+    
+    if item is None:
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+    
+    # Soft delete so pending orders still have to get delivered and banned items are still visible in database.
+    item.status = ItemStatus.DELETED
+    item.deleted_at = datetime.now(timezone.utc)
+    
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    
+    return item
+
+def delete_items_all_service(user: User, session: Session) -> list[Item]:
+    """
+    This function is automatically called upon user deletion.
+    """
+    get_item = GetItem()
+    get_item.base_private()
+    get_item.get_by("seller_id", user.id)
+    
+    items = get_item.get_many(session, with_for_update=True)
+    
+    for item in items:
+        item.status = ItemStatus.DELETED
+        item.deleted_at = datetime.now(timezone.utc)
+        
+    session.add_all(items)
+    session.commit()
+    
+    for item in items:
+        session.refresh(item)
+    
+    return items
+
+def change_item_ban_status_service(session: Session, item_id: int, ban: bool) -> Item:
+    get_item = GetItem()
+    get_item.base_private()
+    get_item.get_by("id", item_id)
+    
+    item = get_item.get_one(session, with_for_update=True)
+    
+    if item is None:
+        raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+    
+    if (item.status is ItemStatus.BANNED and ban is True) or (item.status is not ItemStatus.BANNED and ban is False):
+        raise ExceptionStatusOverlap_409(ObjectType.ITEM)
+    
+    if item.status is ItemStatus.BANNED:
+        item.status = ItemStatus.SUSPENDED
+        item.banned_at = None
+    else:
+        item.status = ItemStatus.BANNED
+        item.banned_at = datetime.now(timezone.utc)
+    
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    
+    return item

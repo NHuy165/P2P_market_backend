@@ -1,7 +1,7 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from ..models_schemas.exceptions import ExceptionCustom, ExceptionResponse
+from .core import ExceptionCustom, ExceptionResponse
 
 def custom_exceptions_handler(request: Request, e: ExceptionCustom):
     response = ExceptionResponse(

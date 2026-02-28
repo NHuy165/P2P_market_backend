@@ -4,6 +4,11 @@ from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime, timezone
 from enum import Enum
 
+if TYPE_CHECKING:
+    from .items import Item, ItemOutput
+    from .orders import Order, OrderOutput
+    from .transactions import Transaction, TransactionOutput
+
 class UserStatus(Enum):
     ACTIVE = "ACTIVE"
     BANNED = "BANNED"
@@ -35,10 +40,6 @@ class UserOutput(UserBase):
     
 # ----- OUTPUT PRIVATE ----- #
 
-from .items import ItemOutput
-from .orders import OrderOutput
-from .transactions import TransactionOutput
-
 # User profile shown to account owner and admins    
 class UserOutputPrivate(UserOutput):
     email: EmailStr
@@ -47,7 +48,7 @@ class UserOutputPrivate(UserOutput):
     is_active: bool
     
     
-    items: list[ItemOutput]
+    items: list["ItemOutput"]
     
     # These would be too heavy
     
@@ -84,11 +85,6 @@ class PasswordUpdate(BaseModel):
     new_password: Annotated[str, Field(min_length=8)]
     
 # ----- DATABASE ----- #
-
-if TYPE_CHECKING:
-    from .items import Item
-    from .orders import Order
-    from .transactions import Transaction
     
 # User in database    
 class User(UserBase, table=True):

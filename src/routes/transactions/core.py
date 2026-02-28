@@ -1,10 +1,12 @@
 from fastapi import APIRouter, status, HTTPException
 
-from ...models_schemas.exceptions import Responses
+from src.repository.core import CriterionInput
+
+from ...exceptions.core import Responses
 from ...core.dependencies import UserDep
 from ...core.database import SessionDep
-from ...services.transactions.core import change_money, read_transactions_service  
-from ...models_schemas.transactions import TransactionSearchSortFilter, TransactionType, TransactionOutput, TransactionInput
+from ...services.transactions import change_money, read_transactions_service  
+from ...models_schemas.transactions import TransactionType, TransactionOutput, TransactionInput
 
 router = APIRouter()
 
@@ -36,13 +38,13 @@ def withdraw(user: UserDep, session: SessionDep, inp: TransactionInput):
 
 # ----- Transaction read ----- #
 
-@router.get("/", response_model=list[TransactionOutput])
-def read_transactions_all(user: UserDep, session: SessionDep):
-    return read_transactions_service(user, session)
-
-@router.get("", response_model=list[TransactionOutput])
-def read_transactions_sort_filter(user: UserDep, session: SessionDep, sort_filter: TransactionSearchSortFilter):
-    return read_transactions_service(user, session, sort_filter)
+@router.post("", response_model=list[TransactionOutput],
+             responses={
+                 401: Responses.RESPONSE_401_UNAUTHORIZED,
+                 403: Responses.RESPONSE_403_FORBIDDEN,
+             })
+def read_transactions(user: UserDep, session: SessionDep, criteria: list[CriterionInput] = []):
+    return read_transactions_service(user, session, criteria)
         
         
     

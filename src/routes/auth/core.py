@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import Annotated
 
-from src.services.auth.core import login_service
-from ...models_schemas.exceptions import Responses, ExceptionAuthentication_401
+from src.services.auth import login_service
+from ...exceptions.core import Responses, ExceptionAuthentication_401
 from ...models_schemas.auth import TokenOutput
 from ...core.database import SessionDep
 

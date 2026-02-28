@@ -1,27 +1,34 @@
 from datetime import datetime, timezone
-
 from pydantic import EmailStr
-from sqlmodel import Session, or_, select
+from sqlmodel import Session
 
-from ..items.core import delete_items_all_service, suspend_items_all_service
-from .get import get_user_service
-from ...models_schemas.orders import Order, OrderStatus
-from ...core.security import get_hashed, verify_hashed
-from ...models_schemas.users import PasswordUpdate, User, UserGet, UserInput, UserStatus, UserUpdate
-from ...models_schemas.exceptions import ExceptionAuthentication_401, ExceptionModifiedAdmin_403, ExceptionStatusOverlap_409, ExceptionUnfinishedOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionNotFound_404, ObjectType
+from ..repository.core import CompareOperator, CriterionGet
+from ..repository.orders import GetOrder
+from ..repository.users import GetUser
+from .items import delete_items_all_service, suspend_items_all_service
+from ..models_schemas.orders import OrderStatus
+from ..core.security import get_hashed, verify_hashed
+from ..models_schemas.users import PasswordUpdate, User, UserInput, UserStatus, UserUpdate
+from ..exceptions.core import ExceptionAuthentication_401, ExceptionModifiedAdmin_403, ExceptionStatusOverlap_409, ExceptionUnfinishedOrders_409, ExceptionTakenUserEmail_409, ExceptionTakenUserName_409, ExceptionNotFound_404, ObjectType
 
 # ----- User create ----- #
 
 def check_name_exists(username: str, session: Session):
-    user_get = UserGet(username=username)
-    user = get_user_service(session, user_get)
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("username", username)
+
+    user = get_user.get_one(session)
     
     if user is not None:
         raise ExceptionTakenUserName_409()
         
 def check_email_exists(email: EmailStr, session: Session):
-    user_get = UserGet(email=email)
-    user = get_user_service(session, user_get)
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("email", email)
+
+    user = get_user.get_one(session)
     
     if user is not None:
         raise ExceptionTakenUserEmail_409()
@@ -43,8 +50,11 @@ def register_user_service(user: UserInput, session: Session) -> User:
 # ----- User read ----- #
 
 def read_user_service(session: Session, user_id: int) -> User:
-    user_get = UserGet(id=user_id)
-    user = get_user_service(session, user_get)
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("id", user_id)
+
+    user = get_user.get_one(session)
     
     if user is None:
         raise ExceptionNotFound_404(ObjectType.USER, user_id)
@@ -81,9 +91,16 @@ def delete_user_service(user: User, session: Session, password: str) -> User:
         raise ExceptionAuthentication_401()
     
     # Checks for existing unfinished order
-    query = select(Order).where(or_(Order.seller_id == user.id, Order.buyer_id == user.id), Order.status is not OrderStatus.DELIVERED)
-    result = session.exec(query).first()
-    if result is not None:
+    assert user.id is not None
+    
+    get_order = GetOrder()
+    get_order.base_both(user.id)
+    not_delivered = CriterionGet("status", OrderStatus.DELIVERED, CompareOperator.NE)
+    get_order.apply_criterion(not_delivered)
+    
+    order = get_order.get_one(session)
+    
+    if order is not None:
         raise ExceptionUnfinishedOrders_409()
     
     # Deletion
@@ -101,8 +118,11 @@ def delete_user_service(user: User, session: Session, password: str) -> User:
     return user
 
 def change_user_ban_status_service(session: Session, user_id: int, ban: bool) -> User:
-    user_get = UserGet(id=user_id, include_banned=True)
-    user = get_user_service(session, user_get)
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("id", user_id)
+    
+    user = get_user.get_one(session)
     
     if user is None:
         raise ExceptionNotFound_404(ObjectType.USER, user_id)

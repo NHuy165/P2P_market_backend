@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
-from src.core.database import SessionDep
-from src.models_schemas.exceptions import Responses
-from src.models_schemas.users import UserOutputPrivate
-from src.services.users.core import change_user_ban_status_service, read_user_service
+from ...core.database import SessionDep
+from ...exceptions.core import Responses
+from ...models_schemas.users import UserOutputPrivate
+from ...services.users import change_user_ban_status_service, read_user_service
 
 router = APIRouter()
 

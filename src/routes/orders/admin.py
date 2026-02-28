@@ -3,23 +3,23 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from src.core.database import SessionDep
-from src.models_schemas.exceptions import Responses
-from src.models_schemas.items import ItemOutputPrivate, ItemSearch, ItemSortFilterPrivate
-from src.models_schemas.orders import OrderOutput, OrderSearchSortFilter
-from src.services.orders.core import approve_order_service, complete_order_service, delete_order_admin_service, read_orders_admin_service
+from ...core.database import SessionDep
+from ...exceptions.core import Responses
+from ...models_schemas.orders import OrderOutput
+from ...repository.core import CriterionInput
+from ...services.orders import approve_order_service, complete_order_service, delete_order_admin_service, read_orders_admin_service
 
 
 router = APIRouter()
 
 # ----- Order read (ADMIN) ----- #
 
-@router.get("/{user_id}", response_model=list[OrderOutput],
+@router.post("/{user_id}", response_model=list[OrderOutput],
             responses={
                 404: Responses.RESPONSE_404_NOT_FOUND
             })
-def read_orders_many_admin(session: SessionDep, user_id: int, sort_filter: Annotated[OrderSearchSortFilter, Query()]):
-    return read_orders_admin_service(session, user_id, sort_filter)
+def read_orders_admin(session: SessionDep, user_id: int, type: Annotated[bool | None, Query()] = None, criteria: list[CriterionInput] = []):
+    return read_orders_admin_service(session, user_id, type, criteria)
     
 # ----- Order update (ADMIN) ----- #
 

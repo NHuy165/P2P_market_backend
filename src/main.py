@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, FastAPI
 from typing import Any
 
-from .models_schemas.exceptions import ExceptionCustom, Responses
+from .exceptions.core import ExceptionCustom, Responses
 from .core.dependencies import verify_admin
 from .routes import auth, items, orders, transactions, users
 from .core.database import create_db_and_tables
-from .core.exceptions_handling import custom_exceptions_handler
+from .exceptions.handler import custom_exceptions_handler
 
 # Main app
 # Can't add generic error responses here since some functions do not need users to log in.

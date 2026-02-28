@@ -2,6 +2,9 @@ from pydantic import BaseModel
 from enum import Enum
 from fastapi import status
 
+from src.models_schemas.users import UserStatus
+from src.repository.core import ObjectType
+
 # ----- CUSTOM EXCEPTIONS SCHEMAS ----- #
         
 class ExceptionType(Enum):
@@ -10,7 +13,11 @@ class ExceptionType(Enum):
     """
     
     # 400
+    TYPE = "TYPE"
+    REQUEST = "REQUEST"
+    INVALID_FIELD = "INVALID_FIELD"
     RELATIVE_ABSOLUTE = "RELATIVE_ABSOLUTE"
+    SORT_CONTRADICTION = "SORT_CONTRADICTION"
     
     # 401
     AUTHENTICATION = "AUTHENTICATION"
@@ -82,9 +89,25 @@ class Responses:
 
 # ----- 400 ----- #
 
+class ExceptionRequest_400(ExceptionCustom):
+    def __init__(self, desc: str):
+        super().__init__(400, ExceptionType.REQUEST, desc)
+        
+class ExceptionType_400(ExceptionCustom):
+    def __init__(self, type: str):
+        super().__init__(400, ExceptionType.TYPE, f"Value has invalid type. Type expected: {type}")
+        
+class ExceptionInvalidField_400(ExceptionCustom):
+    def __init__(self, obj: ObjectType, field: str):
+        super().__init__(400, ExceptionType.INVALID_FIELD, f"{obj.capitalize()} has no field called {field}.")
+        
 class ExceptionRelativeAbsolute_400(ExceptionCustom):
     def __init__(self):
         super().__init__(400, ExceptionType.RELATIVE_ABSOLUTE, "Request features both relative and absolute modifications to a single value.")
+        
+class ExceptionSortContradiction_400(ExceptionCustom):
+    def __init__(self, att: str, obj: str):
+        super().__init__(400, ExceptionType.SORT_CONTRADICTION, f"The following attribute was sorted by both descending and ascending orders: {att} (class: {obj})")
 
 # ----- 401 ----- #
 
@@ -96,14 +119,11 @@ class ExceptionAuthentication_401(ExceptionCustom):
 # ----- 403 ----- #
 
 class ExceptionInvalidAccount_403(ExceptionCustom):
-    def __init__(self, is_banned: bool = False, is_deleted: bool = False, is_inactive: bool = False):
-        if is_banned:
+    def __init__(self, status: UserStatus):
+        if status == UserStatus.BANNED:
             super().__init__(403, ExceptionType.INVALID_ACCOUNT, "This account has been banned.")
-        elif is_deleted:
+        elif status == UserStatus.DELETED:
             super().__init__(403, ExceptionType.AUTHENTICATION, "This account has been deleted.")
-        # Checked last, since a deleted or banned account is automatically deactivated.
-        elif is_inactive:
-            super().__init__(403, ExceptionType.AUTHENTICATION, "This account is inactive.")
 
 class ExceptionNotAdmin_403(ExceptionCustom):
     def __init__(self):
@@ -115,10 +135,7 @@ class ExceptionModifiedAdmin_403(ExceptionCustom):
         
 # ----- 404 ----- #
 
-class ObjectType(str, Enum):
-    ITEM = "item"
-    ORDER = "order"
-    USER = "user"
+
 
 class ExceptionNotFound_404(ExceptionCustom):
     def __init__(self, obj: ObjectType, id: int):

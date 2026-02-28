@@ -6,8 +6,8 @@ from pydantic import ValidationError
 
 from .database import SessionDep
 from ..models_schemas.auth import TokenInput
-from ..models_schemas.users import User
-from ..models_schemas.exceptions import ExceptionAuthentication_401, ExceptionInvalidAccount_403, ExceptionNotAdmin_403
+from ..models_schemas.users import User, UserStatus
+from ..exceptions.core import ExceptionAuthentication_401, ExceptionInvalidAccount_403, ExceptionNotAdmin_403
 from .config import settings
 
 # Using auto_error=False so we handle the errors by ourselves
@@ -41,10 +41,8 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], session: Ses
         raise ExceptionAuthentication_401()
     
     # User account is invalid
-    if not user.is_active or user.is_banned or user.is_deleted:
-        raise ExceptionInvalidAccount_403(is_banned=user.is_banned,
-                                      is_deleted=user.is_deleted,
-                                      is_inactive=not(user.is_active))
+    if user.status is not UserStatus.ACTIVE:
+        raise ExceptionInvalidAccount_403(user.status)
     return user
             
 UserDep = Annotated[User, Depends(get_current_user)]
