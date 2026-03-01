@@ -1,6 +1,6 @@
-import jwt # Token encoder
-from .config import settings # Token encoder algorithm
-from pwdlib import PasswordHash # Password hasher
+import jwt
+from .config import settings
+from pwdlib import PasswordHash
 
 from datetime import datetime, timedelta, timezone
 

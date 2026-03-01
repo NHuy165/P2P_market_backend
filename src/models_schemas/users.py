@@ -1,13 +1,15 @@
+from decimal import Decimal
+
 from pydantic import EmailStr, BaseModel
 from typing import Annotated, TYPE_CHECKING
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import Column, Numeric, SQLModel, Field, Relationship
 from datetime import datetime, timezone
 from enum import Enum
 
 if TYPE_CHECKING:
     from .items import Item, ItemOutput
-    from .orders import Order, OrderOutput
-    from .transactions import Transaction, TransactionOutput
+    from .orders import Order
+    from .transactions import Transaction
 
 class UserStatus(Enum):
     ACTIVE = "ACTIVE"
@@ -43,7 +45,7 @@ class UserOutput(UserBase):
 # User profile shown to account owner and admins    
 class UserOutputPrivate(UserOutput):
     email: EmailStr
-    balance: float
+    balance: Decimal
     
     is_active: bool
     
@@ -92,7 +94,7 @@ class User(UserBase, table=True):
     
     email: EmailStr
     hashed_password: Annotated[str, Field(min_length=8)]
-    balance: float = 0
+    balance: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)))] = Decimal(0)
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deleted_at: datetime | None = None

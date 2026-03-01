@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Query
 from typing import Annotated
 
-from src.repository.core import CriterionInput
-
+from ...repository.core import CriterionInput
 from ...core.dependencies import UserDep
 from ...exceptions.core import Responses 
 from ...core.database import SessionDep

@@ -2,13 +2,9 @@ from enum import Enum
 from typing import Any, get_type_hints, Generic, TypeVar
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlmodel.sql.expression import SelectOfScalar
-from sqlmodel import Session, col, select
+from sqlmodel import Session, col
 
 from ..exceptions.core import ExceptionInvalidField_400, ExceptionRequest_400, ExceptionSortContradiction_400, ExceptionType_400
-from ..models_schemas.items import Item, ItemStatus
-from ..models_schemas.orders import Order
-from ..models_schemas.transactions import Transaction
-from ..models_schemas.users import User
 
 # ----- Criterion classes ----- #
 class CompareOperator(str, Enum):

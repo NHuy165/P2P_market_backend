@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel
 from enum import Enum
 from fastapi import status
@@ -164,7 +166,7 @@ class ExceptionStatusOverlap_409(ExceptionCustom):
         super().__init__(409, ExceptionType.STATUS_OVERLAP, f"This {obj} already has the desired state.")
 
 class ExceptionInvalidValue_409(ExceptionCustom):
-    def __init__(self, name: str, value: int | float):
+    def __init__(self, name: str, value: int | Decimal):
         super().__init__(409, ExceptionType.INVALID_VALUE, f"Action causes value to fall out of acceptable range. Name: {name}. Value after action: {value}")
 
 # Certain actions to self-owned objects are forbidden, such as buying your own items.        

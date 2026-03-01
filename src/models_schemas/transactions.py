@@ -1,6 +1,8 @@
-from pydantic import EmailStr, BaseModel
+from decimal import Decimal
+
+from pydantic import BaseModel
 from typing import Annotated, TYPE_CHECKING
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import Column, Numeric, SQLModel, Field, Relationship
 from enum import Enum
 from datetime import datetime, timezone
 
@@ -22,7 +24,7 @@ class TransactionStatus(str, Enum):
 # ----- BASE ----- #
 
 class TransactionBase(SQLModel):
-    amount: Annotated[float, Field(gt=0)]
+    amount: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)), gt=0)]
     
 # ----- INPUT ----- #
 
@@ -43,55 +45,6 @@ class TransactionOutput(TransactionBase):
     created_at: datetime
     finished_at: datetime | None
     status: TransactionStatus
-    
-# ----- SORT AND FILTER ----- #
-
-class TransactionAttrSort(str, Enum):
-    transaction_id = "id"
-    transaction_order_id = "order_id"
-    transaction_user_id = "user_id"
-    
-    transaction_type = "type"
-    transaction_status = "status"
-    
-    transaction_created_at = "created_at"
-    transaction_finished_at = "finished_at"
-    transaction_amount = "amount"
-    
-
-class TransactionSearchSortFilter(BaseModel):
-    id: int | None = None
-    order_id: int | None = None
-    user_id: int | None = None
-    
-    type: TransactionType | None = None
-    status: TransactionStatus | None = None
-    
-    amount_lower: float | None = None
-    amount_higher: float | None = None 
-    
-    created_at_lower: datetime | None = None
-    created_at_higher: datetime | None = None
-    
-    finished_at_lower: datetime | None = None
-    finished_at_higher: datetime | None = None
-    
-    include_deposit: bool = True
-    include_withdrawal: bool = True
-    include_sale: bool = True
-    include_purchase: bool = True
-    include_refund: bool = True
-    include_admin_add: bool = True
-    include_admin_subtract: bool = True
-    
-    include_on_hold: bool = True
-    include_success: bool = True
-    include_failed: bool = True
-    
-    sorted_by: TransactionAttrSort = TransactionAttrSort.transaction_id
-    sorted_ascending: bool = True
-
-# ----- FILTER ----- #
 
 # ----- UPDATE ----- #
     

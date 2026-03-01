@@ -1,6 +1,4 @@
-
 from typing import Annotated
-
 from fastapi import APIRouter, Query
 
 from ...core.database import SessionDep

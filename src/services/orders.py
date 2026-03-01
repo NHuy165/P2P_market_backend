@@ -10,7 +10,6 @@ from ..models_schemas.orders import Order, OrderInput, OrderOutput, OrderStatus
 from ..models_schemas.users import User
 from ..models_schemas.transactions import Transaction, TransactionType, TransactionStatus
 
-
 # ----- Order create ----- #
 
 def create_order_service(user: User, session: Session, order_inp: OrderInput) -> Order:

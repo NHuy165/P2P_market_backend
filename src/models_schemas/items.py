@@ -1,6 +1,8 @@
+from decimal import Decimal
+
 from pydantic import BaseModel
 from typing import Annotated, TYPE_CHECKING
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import Column, Numeric, SQLModel, Field, Relationship
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -12,7 +14,7 @@ if TYPE_CHECKING:
 
 class ItemBase(SQLModel):
     name: Annotated[str, Field(min_length=1)]
-    price: Annotated[float, Field(gt=0)]
+    price: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)), gt=0)]
     description: str | None = None
     stock_quantity: Annotated[int, Field(ge=0)] = 0 
     
@@ -58,62 +60,11 @@ class ItemOutputPrivate(ItemOutput):
     
     orders: list["OrderOutputNoType"]
     
-# ----- SEARCH ----- #
-
-class ItemSearch(BaseModel):
-    id: int | None = None
-    name: str | None = None
-    seller_id: int | None = None 
-
-# ----- SORT AND FILTER ----- #
-
-class ItemAttrSortPrivate(str, Enum):
-    item_id = "id"
-    
-    item_name = "name"
-    item_price = "price"
-    item_stock_quantity = "stock_quantity"
-    item_created_at = "created_at"
-
-    item_status = "status"
-    
-class ItemAttrSortPublic(str, Enum):
-    item_id = "id"
-    item_name = "name"
-    
-    item_price = "price"
-    item_stock_quantity = "stock_quantity"
-    item_created_at = "created_at"
-    
-    item_seller_id = "seller_id"
-    
-class ItemSortFilterBase(BaseModel):
-    price_lower: float | None = None
-    price_upper: float | None = None
-    
-    stock_quantity_lower: float | None = None
-    stock_quantity_higher: float | None = None
-    
-    created_at_lower: datetime | None = None
-    created_at_higher: datetime | None = None
-    
-    sorted_ascending: bool = True
-    
-class ItemSortFilterPublic(ItemSortFilterBase):
-    sorted_by: ItemAttrSortPublic = ItemAttrSortPublic.item_id
-    
-class ItemSortFilterPrivate(ItemSortFilterBase):
-    sorted_by: ItemAttrSortPrivate = ItemAttrSortPrivate.item_id
-    
-    include_active: bool = True
-    include_suspended: bool = False
-    include_banned: bool = False
-    
 # ----- UPDATE ----- #
 
 class ItemUpdate(ItemBase):
     name: Annotated[str | None, Field(min_length=1)] = None
-    price: Annotated[float | None, Field(gt=0)] = None
+    price: Annotated[Decimal | None, Field(gt=0)] = None
     description: str | None = None
     stock_quantity: Annotated[int | None, Field(ge=0)] = None
     stock_quantity_relative: int | None = None

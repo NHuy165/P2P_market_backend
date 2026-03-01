@@ -1,8 +1,8 @@
 from sqlmodel import select
 
-from src.exceptions.core import ExceptionRequest_400
-from src.models_schemas.transactions import Transaction
-from src.repository.core import Criterion, CriterionInput, GetObject, ObjectType
+from ..exceptions.core import ExceptionRequest_400
+from ..models_schemas.transactions import Transaction
+from .core import GetObject, ObjectType
 
 
 class GetTransaction(GetObject[Transaction]):

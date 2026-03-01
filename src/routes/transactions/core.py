@@ -1,7 +1,6 @@
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter
 
-from src.repository.core import CriterionInput
-
+from ...repository.core import CriterionInput
 from ...exceptions.core import Responses
 from ...core.dependencies import UserDep
 from ...core.database import SessionDep

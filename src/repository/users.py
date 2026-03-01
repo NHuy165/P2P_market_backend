@@ -1,8 +1,8 @@
 from sqlmodel import select
 
-from src.exceptions.core import ExceptionRequest_400
-from src.models_schemas.users import User, UserStatus
-from src.repository.core import GetObject, ObjectType
+from ..exceptions.core import ExceptionRequest_400
+from ..models_schemas.users import User, UserStatus
+from .core import GetObject, ObjectType
 
 class GetUser(GetObject[User]):
     def __init__(self):

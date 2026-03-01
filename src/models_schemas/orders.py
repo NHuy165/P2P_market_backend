@@ -1,6 +1,8 @@
-from pydantic import EmailStr, BaseModel
+from decimal import Decimal
+
+from pydantic import BaseModel
 from typing import Annotated, TYPE_CHECKING
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import Column, Numeric, SQLModel, Field, Relationship
 from enum import Enum
 from datetime import datetime, timezone
 
@@ -32,7 +34,7 @@ from .users import UserOutput
 class OrderOutputNoRelationship(OrderBase):
     id: int
     
-    price_per_item: float
+    price_per_item: Numeric
     
     item_id: int
     buyer_id: int
@@ -49,52 +51,6 @@ class OrderOutputNoType(OrderOutputNoRelationship):
     
 class OrderOutput(OrderOutputNoType):
     type: str
-    
-# ----- SORT AND FILTER ----- #
-
-class OrderAttrSort(str, Enum):
-    order_id = "id"
-    order_item_id = "item_id"
-    order_buyer_id = "buyer_id"
-    order_seller_id = "seller_id"
-    
-    order_quantity = "quantity"
-    
-    order_created_at = "created_at"
-    order_finished_at = "finished_at"
-    order_price_per_item = "price_per_item"
-    order_status = "status"
-    order_type = "type"
-
-class OrderSearchSortFilter(BaseModel):
-    id: int | None = None
-    item_id: int | None = None
-    buyer_id: int | None = None
-    seller_id: int | None = None
-    
-    status: OrderStatus | None = None
-    
-    quantity_lower: int | None = None
-    quantity_higher: int | None = None
-    
-    created_at_lower: datetime | None = None
-    created_at_higher: datetime | None = None
-    
-    finished_at_lower: datetime | None = None
-    finished_at_higher: datetime | None = None
-    
-    price_per_item_lower: float | None = None
-    price_per_item_higher: float | None = None
-    
-    type: bool | None = None # True for sell orders only, False for buy orders only, None for both
-    
-    include_pending: bool = True
-    include_cancelled: bool = True
-    include_shipped: bool = True
-    include_delivered: bool = True
-    
-    sorted_by: OrderAttrSort = OrderAttrSort.order_id
-    sorted_ascending: bool = True
 
 # ----- UPDATE ----- #
 
@@ -119,7 +75,7 @@ class Order(OrderBase, table=True):
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: datetime | None = None
-    price_per_item: Annotated[float, Field(gt=0)] # Prevents price changes
+    price_per_item: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)), gt=0)] # Prevents price changes
     status: OrderStatus = OrderStatus.PENDING
 
     item: "Item" = Relationship(back_populates="orders")

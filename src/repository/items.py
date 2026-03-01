@@ -1,8 +1,8 @@
 from sqlmodel import select
 
-from src.exceptions.core import ExceptionRequest_400
-from src.models_schemas.items import Item, ItemStatus
-from src.repository.core import Criterion, CriterionInput, GetObject, ObjectType
+from ..exceptions.core import ExceptionRequest_400
+from ..models_schemas.items import Item, ItemStatus
+from .core import Criterion, CriterionInput, GetObject, ObjectType
 
 
 class GetItem(GetObject[Item]):

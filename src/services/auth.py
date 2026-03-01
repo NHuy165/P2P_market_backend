@@ -5,7 +5,6 @@ from ..exceptions.core import ExceptionAuthentication_401
 from ..repository.users import GetUser
 from ..core.security import verify_hashed, create_access_token
 
-
 # ----- Login for token ----- #
 
 def login_service(email: EmailStr, password: str, session: Session) -> str:
