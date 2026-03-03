@@ -1,15 +1,37 @@
-from fastapi import APIRouter, Depends, FastAPI
-from typing import Any
+from contextlib import asynccontextmanager
 
-from .exceptions.core import ExceptionCustom, Responses
+from fastapi import APIRouter, Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from .core.database import create_db_and_tables, dispose
 from .core.dependencies import verify_admin
+from .exceptions.core import ExceptionCustom, Responses
+from .exceptions.handler import (
+    custom_exceptions_handler,
+    generic_handler,
+    starlette_exceptions_handler,
+    validation_exceptions_handler,
+)
 from .routes import auth, items, orders, transactions, users
-from .core.database import create_db_and_tables
-from .exceptions.handler import custom_exceptions_handler
 
 # Main app
 # Can't add generic error responses here since some functions do not need users to log in.
-app = FastAPI()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await create_db_and_tables()
+
+    # App runs
+    yield
+
+    # Shutdown
+    await dispose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 # For adding admin routers, and these all use the verify_admin dependency.
 admin_router = APIRouter(
@@ -17,22 +39,23 @@ admin_router = APIRouter(
     responses={
         401: Responses.RESPONSE_401_UNAUTHORIZED,
         403: Responses.RESPONSE_403_FORBIDDEN,
-    }
+    },
 )
 
-app.add_exception_handler(ExceptionCustom, custom_exceptions_handler) # type: ignore
+# Adding exception handlers
+app.add_exception_handler(RequestValidationError, validation_exceptions_handler)  # type: ignore
+app.add_exception_handler(StarletteHTTPException, starlette_exceptions_handler)  # type: ignore
+app.add_exception_handler(ExceptionCustom, custom_exceptions_handler)  # type: ignore
+app.add_exception_handler(Exception, generic_handler)
 
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
-    
+
 # ----- Auth ----- #
 
 app.include_router(
     auth.core.router,
     prefix="",
     tags=["auth"],
-    )
+)
 
 # ----- Users ----- #
 
@@ -40,7 +63,7 @@ app.include_router(
     users.core.router,
     prefix="/users",
     tags=["users"],
-    )
+)
 
 admin_router.include_router(
     users.admin.router,
@@ -48,13 +71,13 @@ admin_router.include_router(
     tags=["users"],
 )
 
-# ----- Items ----- # 
+# ----- Items ----- #
 
 app.include_router(
     items.core.router,
     prefix="/items",
     tags=["items"],
-    )
+)
 
 admin_router.include_router(
     items.admin.router,
@@ -62,13 +85,19 @@ admin_router.include_router(
     tags=["items"],
 )
 
-# ----- Orders ----- #  
+# ----- Orders ----- #
 
 app.include_router(
     orders.core.router,
     prefix="/orders",
     tags=["orders"],
-    )
+)
+
+admin_router.include_router(
+    orders.admin.router,
+    prefix="/items",
+    tags=["items"],
+)
 
 # ----- Transactions ----- #
 
@@ -76,7 +105,13 @@ app.include_router(
     transactions.core.router,
     prefix="/transactions",
     tags=["transactions"],
-    )
+)
+
+admin_router.include_router(
+    transactions.admin.router,
+    prefix="/items",
+    tags=["items"],
+)
 
 # ----- Admin ----- #
 
@@ -84,4 +119,4 @@ app.include_router(
     admin_router,
     prefix="/admin",
     tags=["admin"],
-    )
+)

@@ -2,7 +2,7 @@ fastapi[standard]
 
 # Database
 sqlmodel
-psycopg[binary]
+asyncpg
 
 # Security
 pyjwt
@@ -11,3 +11,4 @@ python-dotenv
 
 # Testing
 pytest
+pytest_asyncio
