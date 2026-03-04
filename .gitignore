@@ -1,4 +1,5 @@
 venv/
 .env
 to_do.txt
-
+fixes.txt
+.vscode/

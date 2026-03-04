@@ -4,9 +4,15 @@ from enum import Enum
 from pydantic import BaseModel
 
 from src.models_schemas.users import UserStatus
-from src.repository.core import ObjectType
 
 # ----- CUSTOM EXCEPTIONS SCHEMAS ----- #
+
+
+class ObjectType(str, Enum):
+    ITEM = "Item"
+    ORDER = "Order"
+    USER = "User"
+    TRANSACTION = "Transaction"
 
 
 class ExceptionType(Enum):
@@ -69,7 +75,7 @@ class ExceptionCustom(Exception):
 
 # Response schema for documentation
 class ExceptionResponse(BaseModel):
-    exception_type: ExceptionType
+    exception_type: str  # Taken from ExceptionType
     message: str
 
 

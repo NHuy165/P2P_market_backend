@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+import uvicorn
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -120,3 +121,6 @@ app.include_router(
     prefix="/admin",
     tags=["admin"],
 )
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

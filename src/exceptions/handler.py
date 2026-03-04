@@ -7,7 +7,9 @@ from .core import ExceptionCustom, ExceptionResponse, ExceptionType
 
 
 async def custom_exceptions_handler(request: Request, e: ExceptionCustom):
-    response = ExceptionResponse(exception_type=e.exception_type, message=e.message)
+    response = ExceptionResponse(
+        exception_type=e.exception_type.value, message=e.message
+    )
     return JSONResponse(
         status_code=e.status_code, content=response.model_dump(), headers=e.headers
     )
@@ -23,7 +25,9 @@ async def starlette_exceptions_handler(request: Request, e: StarletteHTTPExcepti
     else:
         exception_type = ExceptionType.REQUEST
 
-    response = ExceptionResponse(exception_type=exception_type, message=str(e.detail))
+    response = ExceptionResponse(
+        exception_type=exception_type.value, message=str(e.detail)
+    )
     return JSONResponse(
         status_code=e.status_code, content=response.model_dump(), headers=e.headers
     )
@@ -32,13 +36,13 @@ async def starlette_exceptions_handler(request: Request, e: StarletteHTTPExcepti
 # Deliberate conversion of 422 to 400 here.
 async def validation_exceptions_handler(request: Request, e: RequestValidationError):
     response = ExceptionResponse(
-        exception_type=ExceptionType.REQUEST, message="Request validation failed."
+        exception_type=ExceptionType.REQUEST.value, message="Request validation failed."
     )
     return JSONResponse(status_code=400, content=response.model_dump())
 
 
 async def generic_handler(request: Request, e: Exception):
     response = ExceptionResponse(
-        exception_type=ExceptionType.REQUEST, message="Internal server error."
+        exception_type=ExceptionType.REQUEST.value, message="Internal server error."
     )
     return JSONResponse(status_code=500, content=response.model_dump())

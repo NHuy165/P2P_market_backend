@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Optional
 
-from sqlmodel import Column, Field, Numeric, Relationship, SQLModel
+from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .orders import Order
@@ -70,8 +70,13 @@ class Transaction(TransactionBase, table=True):
 
     type: TransactionType
     status: TransactionStatus
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    finished_at: datetime | None = None
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    finished_at: Annotated[
+        datetime | None, Field(sa_column=Column(DateTime(timezone=True)))
+    ] = None
 
     user: "User" = Relationship(back_populates="transactions")
-    order: "Order | None" = Relationship(back_populates="transactions")
+    order: Optional["Order"] = Relationship(back_populates="transactions")

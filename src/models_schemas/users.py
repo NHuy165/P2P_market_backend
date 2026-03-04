@@ -4,10 +4,10 @@ from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, EmailStr
-from sqlmodel import Column, Field, Numeric, Relationship, SQLModel
+from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from .items import Item, ItemOutputPublic
+    from .items import Item
     from .orders import Order
     from .transactions import Transaction
 
@@ -104,20 +104,27 @@ class User(UserBase, table=True):
     hashed_password: Annotated[str, Field(min_length=8)]
     balance: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)))] = Decimal(0)
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    deleted_at: datetime | None = None
-    banned_at: datetime | None = None
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    deleted_at: Annotated[
+        datetime | None, Field(sa_column=Column(DateTime(timezone=True)))
+    ] = None
+    banned_at: Annotated[
+        datetime | None, Field(sa_column=Column(DateTime(timezone=True)))
+    ] = None
 
     is_admin: bool = False
     status: UserStatus = UserStatus.ACTIVE
 
     items: list["Item"] = Relationship(back_populates="seller")  # Items in stock
     buy_orders: list["Order"] = Relationship(
-        back_populates="buyer"
-    )  # Associated buy orders
+        back_populates="buyer",
+        sa_relationship_kwargs={"foreign_keys": "Order.buyer_id"},
+    )
     sell_orders: list["Order"] = Relationship(
-        back_populates="seller"
-    )  # Associated sell orders
-    transactions: list["Transaction"] = Relationship(
-        back_populates="user"
-    )  # Associated transactions
+        back_populates="seller",
+        sa_relationship_kwargs={"foreign_keys": "Order.seller_id"},
+    )
+    transactions: list["Transaction"] = Relationship(back_populates="user")

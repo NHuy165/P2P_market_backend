@@ -13,6 +13,7 @@ from ..exceptions.core import (
     ExceptionRequest_400,
     ExceptionSortContradiction_400,
     ExceptionType_400,
+    ObjectType,
 )
 
 # ----- Criterion classes ----- #
@@ -27,13 +28,6 @@ class CompareOperator(str, Enum):
 
     LT = "lt"
     LE = "le"
-
-
-class ObjectType(str, Enum):
-    ITEM = "Item"
-    ORDER = "Order"
-    USER = "User"
-    TRANSACTION = "Transaction"
 
 
 class Criterion:
@@ -139,9 +133,11 @@ class GetObject(Generic[ModelType]):
         """
         Automatically validate attribute name and type before applying.
         """
+
         if isinstance(criterion, CriterionInput):
             criterion = self.convert_pydantic(criterion)
 
+        # Validate name
         if criterion.field not in self.model_column_names:
             raise ExceptionInvalidField_400(self.model_type, criterion.field)
 
@@ -149,8 +145,9 @@ class GetObject(Generic[ModelType]):
 
         # Get
         if isinstance(criterion, CriterionGet):
+            # Validate type
             try:
-                attr_type = get_type_hints(self.model)[criterion.field]
+                attr_type = self.model.model_fields[criterion.field].annotation
                 adapter = TypeAdapter(attr_type)
                 criterion.value = adapter.validate_python(criterion.value)
 

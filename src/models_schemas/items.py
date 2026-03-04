@@ -3,8 +3,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BaseModel
-from sqlmodel import Column, Field, Numeric, Relationship, SQLModel
+from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .orders import Order, OrderOutputNoType
@@ -93,9 +92,16 @@ class Item(ItemBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
     seller_id: Annotated[int | None, Field(foreign_key="user.id")] = None
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    deleted_at: datetime | None = None
-    banned_at: datetime | None = None
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    deleted_at: Annotated[
+        datetime | None, Field(sa_column=Column(DateTime(timezone=True)))
+    ] = None
+    banned_at: Annotated[
+        datetime | None, Field(sa_column=Column(DateTime(timezone=True)))
+    ] = None
 
     status: ItemStatus
 
@@ -105,3 +111,7 @@ class Item(ItemBase, table=True):
     orders: list["Order"] = Relationship(
         back_populates="item"
     )  # The orders associated with this item
+
+
+from .orders import OrderOutputNoType
+from .users import UserOutput

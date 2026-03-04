@@ -3,7 +3,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
-from sqlmodel import Column, Field, Numeric, Relationship, SQLModel
+from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from .items import Item, ItemOutputPublic
@@ -42,7 +42,7 @@ class OrderInput(OrderBase):
 class OrderOutputNoRelationship(OrderBase):
     id: int
 
-    price_per_item: Numeric
+    price_per_item: Decimal
 
     item_id: int
     buyer_id: int
@@ -84,8 +84,13 @@ class Order(OrderBase, table=True):
     )
     # No transaction foreign key.
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    finished_at: datetime | None = None
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True)),
+    )
+    finished_at: Annotated[
+        datetime | None, Field(sa_column=Column(DateTime(timezone=True)))
+    ] = None
     price_per_item: Annotated[
         Decimal, Field(sa_column=Column(Numeric(10, 2)), gt=0)
     ]  # Prevents price changes
@@ -101,3 +106,7 @@ class Order(OrderBase, table=True):
         sa_relationship_kwargs={"foreign_keys": "Order.seller_id"},
     )
     transactions: list["Transaction"] = Relationship(back_populates="order")
+
+
+from .items import ItemOutputPublic
+from .users import UserOutput

@@ -2,6 +2,7 @@ fastapi[standard]
 
 # Database
 sqlmodel
+psycopg[binary]
 asyncpg
 
 # Security
