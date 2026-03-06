@@ -3,7 +3,10 @@ from fastapi import APIRouter
 from ...core.database import SessionDep
 from ...exceptions.core import Responses
 from ...models_schemas.users import UserOutputPrivate
-from ...services.users import change_user_ban_status_service, read_user_service
+from ...services.users import (
+    change_user_ban_status_service,
+    read_user_admin_service,
+)
 
 router = APIRouter()
 
@@ -16,7 +19,7 @@ router = APIRouter()
     responses={404: Responses.RESPONSE_404_NOT_FOUND},
 )
 async def read_account_admin(session: SessionDep, user_id: int):
-    result = await read_user_service(session, user_id)
+    result = await read_user_admin_service(session, user_id)
     return result
 
 

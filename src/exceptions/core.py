@@ -3,8 +3,6 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from src.models_schemas.users import UserStatus
-
 # ----- CUSTOM EXCEPTIONS SCHEMAS ----- #
 
 
@@ -21,7 +19,6 @@ class ExceptionType(Enum):
     """
 
     # 400
-    TYPE = "TYPE"
     REQUEST = "REQUEST"
     INVALID_FIELD = "INVALID_FIELD"
     RELATIVE_ABSOLUTE = "RELATIVE_ABSOLUTE"
@@ -46,11 +43,10 @@ class ExceptionType(Enum):
     TAKEN_USER_EMAIL = "TAKEN_USER_EMAIL"
     TAKEN_ITEM_NAME = "TAKEN_ITEM_NAME"
     UNFINISHED_ORDERS = "UNFINISHED_ORDERS"
-    STATUS_OVERLAP = "STATUS_OVERLAP"
     INVALID_VALUE = "INVALID_VALUE"
     SELF_OWNED = "SELF_OWNED"
-    NOT_PENDING = "NOT_PENDING"
     TIMEOUT = "TIMEOUT"
+    INVALID_STATUS = "INVALID_STATUS"
 
     # 422
     REQUEST_VALIDATION = "REQUEST_VALIDATION"
@@ -129,13 +125,6 @@ class ExceptionRequest_400(ExceptionCustom):
         super().__init__(400, ExceptionType.REQUEST, desc)
 
 
-class ExceptionType_400(ExceptionCustom):
-    def __init__(self, type: str):
-        super().__init__(
-            400, ExceptionType.TYPE, f"Value has invalid type. Type expected: {type}"
-        )
-
-
 class ExceptionInvalidField_400(ExceptionCustom):
     def __init__(self, obj: ObjectType, field: str):
         super().__init__(
@@ -180,15 +169,12 @@ class ExceptionAuthentication_401(ExceptionCustom):
 
 
 class ExceptionInvalidAccount_403(ExceptionCustom):
-    def __init__(self, status: UserStatus):
-        if status == UserStatus.BANNED:
-            super().__init__(
-                403, ExceptionType.INVALID_ACCOUNT, "This account has been banned."
-            )
-        elif status == UserStatus.DELETED:
-            super().__init__(
-                403, ExceptionType.INVALID_ACCOUNT, "This account has been deleted."
-            )
+    def __init__(self, status: str):
+        super().__init__(
+            403,
+            ExceptionType.INVALID_ACCOUNT,
+            f"This account has been {status}.",
+        )
 
 
 class ExceptionNotAdmin_403(ExceptionCustom):
@@ -256,12 +242,12 @@ class ExceptionUnfinishedOrders_409(ExceptionCustom):
         )
 
 
-class ExceptionStatusOverlap_409(ExceptionCustom):
-    def __init__(self, obj: ObjectType):
+class ExceptionInvalidStatus_409(ExceptionCustom):
+    def __init__(self, obj: ObjectType, status: str):
         super().__init__(
             409,
-            ExceptionType.STATUS_OVERLAP,
-            f"This {obj} already has the desired state.",
+            ExceptionType.INVALID_STATUS,
+            f"This action cannot be performed on an object of type {obj.value} with the status {status}.",
         )
 
 
@@ -281,15 +267,6 @@ class ExceptionSelfOwned_409(ExceptionCustom):
             409,
             ExceptionType.SELF_OWNED,
             f"Cannot perform the following actions on self-owned objects: {desc}",
-        )
-
-
-class ExceptionNotPending_409(ExceptionCustom):
-    def __init__(self):
-        super().__init__(
-            409,
-            ExceptionType.NOT_PENDING,
-            "Action failed because the order is no longer pending.",
         )
 
 

@@ -3,18 +3,15 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..exceptions.core import (
+    ExceptionInvalidStatus_409,
     ExceptionInvalidValue_409,
     ExceptionNotFound_404,
-    ExceptionStatusOverlap_409,
     ExceptionTakenItemName_409,
     ObjectType,
 )
 from ..models_schemas.items import (
     Item,
     ItemInput,
-    ItemOutputPrivate,
-    ItemOutputPrivateFull,
-    ItemOutputPublic,
     ItemStatus,
     ItemUpdate,
 )
@@ -57,7 +54,7 @@ async def read_private_items_many_service(
 ) -> list[Item]:
     get_item = GetItem()
     get_item.base_private()
-    get_item.eager_load_to_output_model(ItemOutputPrivate)
+    get_item.eager_load(["UserOutput"])
     get_item.get_by("seller_id", user.id)
 
     items = await get_item.get_many(session, criteria)
@@ -84,7 +81,7 @@ async def read_private_item_one_service(
 ) -> Item | None:
     get_item = GetItem()
     get_item.base_private()
-    get_item.eager_load_to_output_model(ItemOutputPrivateFull)
+    get_item.eager_load_all()
     get_item.get_by("seller_id", user.id)
     get_item.get_by("id", item_id)
 
@@ -101,7 +98,7 @@ async def read_private_item_one_admin_service(
 ) -> Item | None:
     get_item = GetItem()
     get_item.base_private()
-    get_item.eager_load_to_output_model(ItemOutputPrivateFull)
+    get_item.eager_load_all()
     get_item.get_by("id", item_id)
 
     item = await get_item.get_one(session)
@@ -117,7 +114,7 @@ async def read_public_items_many_service(
 ) -> list[Item]:
     get_item = GetItem()
     get_item.base_public()
-    get_item.eager_load_to_output_model(ItemOutputPublic)
+    get_item.eager_load(["UserOutput"])
 
     items = await get_item.get_many(session, criteria)
     return items
@@ -128,7 +125,7 @@ async def read_public_item_one_service(
 ) -> Item | None:
     get_item = GetItem()
     get_item.base_public()
-    get_item.eager_load_to_output_model(ItemOutputPublic)
+    get_item.eager_load(["UserOutput"])
     get_item.get_by("id", item_id)
 
     item = await get_item.get_one(session)
@@ -150,7 +147,6 @@ async def update_item_service(
     not_banned = CriterionGet("status", ItemStatus.BANNED, CompareOperator.NE)
     not_deleted = CriterionGet("status", ItemStatus.DELETED, CompareOperator.NE)
     get_item.base_custom(criteria=[not_banned, not_deleted])
-    get_item.eager_load_to_output_model(ItemOutputPrivateFull)
     get_item.eager_load(["seller"])
     get_item.get_by("seller_id", user.id)
     get_item.get_by("id", item_id)
@@ -172,7 +168,7 @@ async def update_item_service(
 
     # Activate/suspend overlap
     if item_update.status == item.status:
-        raise ExceptionStatusOverlap_409(ObjectType.ITEM)
+        raise ExceptionInvalidStatus_409(ObjectType.ITEM, item.status.value)
 
     # Actual update code
     update_data = item_update.model_dump(exclude_unset=True)
@@ -195,7 +191,6 @@ async def update_item_service(
 async def suspend_items_all_service(user: User, session: AsyncSession) -> list[Item]:
     get_item = GetItem()
     get_item.base_public()  # Only fetches active items
-    get_item.eager_load_to_output_model(ItemOutputPrivate)
     get_item.get_by("seller_id", user.id)
 
     items = await get_item.get_many(session, with_for_update=True)
@@ -217,7 +212,6 @@ async def suspend_items_all_service(user: User, session: AsyncSession) -> list[I
 async def delete_item_service(user: User, session: AsyncSession, item_id: int) -> Item:
     get_item = GetItem()
     get_item.base_private()
-    get_item.eager_load_to_output_model(ItemOutputPrivate)
     get_item.get_by("seller_id", user.id)
     get_item.get_by("id", item_id)
 
@@ -226,7 +220,7 @@ async def delete_item_service(user: User, session: AsyncSession, item_id: int) -
     if item is None:
         raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
 
-    # Soft delete so pending orders still have to get delivered and banned items are still visible in database.
+    # Soft delete so pending orders still have to get delivered.
     item.status = ItemStatus.DELETED
     item.deleted_at = datetime.now(timezone.utc)
 
@@ -243,7 +237,6 @@ async def delete_items_all_service(user: User, session: AsyncSession) -> list[It
     """
     get_item = GetItem()
     get_item.base_private()
-    get_item.eager_load_to_output_model(ItemOutputPrivate)
     get_item.get_by("seller_id", user.id)
 
     items = await get_item.get_many(session, with_for_update=True)
@@ -265,7 +258,6 @@ async def change_item_ban_status_service(
 ) -> Item:
     get_item = GetItem()
     get_item.base_private()
-    get_item.eager_load_to_output_model(ItemOutputPrivateFull)
     get_item.get_by("id", item_id)
 
     item = await get_item.get_one(session, with_for_update=True)
@@ -276,7 +268,7 @@ async def change_item_ban_status_service(
     if (item.status is ItemStatus.BANNED and ban is True) or (
         item.status is not ItemStatus.BANNED and ban is False
     ):
-        raise ExceptionStatusOverlap_409(ObjectType.ITEM)
+        raise ExceptionInvalidStatus_409(ObjectType.ITEM, item.status.value)
 
     if item.status is ItemStatus.BANNED:
         item.status = ItemStatus.SUSPENDED

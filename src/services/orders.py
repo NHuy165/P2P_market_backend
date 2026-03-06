@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..exceptions.core import (
+    ExceptionInvalidStatus_409,
     ExceptionInvalidValue_409,
     ExceptionNotFound_404,
-    ExceptionNotPending_409,
     ExceptionSelfOwned_409,
     ObjectType,
 )
@@ -334,7 +334,7 @@ async def delete_order_service(
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
     if order.status is not OrderStatus.PENDING:
-        raise ExceptionNotPending_409()
+        raise ExceptionInvalidStatus_409(ObjectType.ORDER, order.status.value)
 
     # Delete logic
     refund_trans = delete_logic(order)
@@ -357,7 +357,7 @@ async def delete_order_admin_service(session: AsyncSession, order_id: int) -> Or
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
     if order.status is not OrderStatus.PENDING:
-        raise ExceptionNotPending_409()
+        raise ExceptionInvalidStatus_409(ObjectType.ORDER, order.status.value)
 
     # Delete logic
     refund_trans = delete_logic(order)

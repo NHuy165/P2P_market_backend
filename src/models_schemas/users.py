@@ -3,8 +3,11 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BaseModel, EmailStr
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, BeforeValidator, EmailStr
 from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
+
+from src.exceptions.core import ExceptionRequest_400
 
 if TYPE_CHECKING:
     from .items import Item
@@ -22,7 +25,7 @@ class UserStatus(Enum):
 
 
 class UserBase(SQLModel):
-    username: Annotated[str, Field(regex=r"^[a-zA-Z0-9_]+$", unique=True)]
+    username: Annotated[str, Field(regex=r"^[a-zA-Z0-9_]+$", unique=True, min_length=1)]
     description: str | None = None
 
 
@@ -78,9 +81,20 @@ class UserGet(BaseModel):
 # ----- UPDATE ----- #
 
 
+# User is not allowed to explicitly set the value to None.
+def forbid_none(s):
+    if s is None:
+        raise ExceptionRequest_400("Request validation failed.")
+    return s
+
+
 class UserUpdate(UserBase):
-    username: Annotated[str | None, Field(regex=r"^[a-zA-Z0-9_]+$")] = None
-    email: EmailStr | None = None
+    username: Annotated[
+        str | None,
+        BeforeValidator(forbid_none),
+        Field(min_length=1),
+    ] = None
+    email: Annotated[EmailStr | None, BeforeValidator(forbid_none), Field()] = None
     description: str | None = None
 
     # is_deleted: bool | None = None (user deletion is done via a separate request)
@@ -102,7 +116,9 @@ class User(UserBase, table=True):
 
     email: EmailStr
     hashed_password: Annotated[str, Field(min_length=8)]
-    balance: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)))] = Decimal(0)
+    balance: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)))] = Decimal(
+        "0.00"
+    )
 
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

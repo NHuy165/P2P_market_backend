@@ -5,16 +5,16 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .core.database import create_db_and_tables, dispose
-from .core.dependencies import verify_admin
-from .exceptions.core import ExceptionCustom, Responses
-from .exceptions.handler import (
+from src.core.database import create_db_and_tables, dispose
+from src.core.dependencies import verify_admin
+from src.exceptions.core import ExceptionCustom, Responses
+from src.exceptions.handler import (
     custom_exceptions_handler,
     generic_handler,
     starlette_exceptions_handler,
     validation_exceptions_handler,
 )
-from .routes import auth, items, orders, transactions, users
+from src.routes import auth, items, orders, transactions, users
 
 # Main app
 # Can't add generic error responses here since some functions do not need users to log in.

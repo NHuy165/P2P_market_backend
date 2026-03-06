@@ -5,6 +5,8 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import ValidationError
 
+from src.repository.users import GetUser
+
 from ..exceptions.core import (
     ExceptionAuthentication_401,
     ExceptionInvalidAccount_403,
@@ -16,7 +18,7 @@ from .config import settings
 from .database import SessionDep
 
 # Using auto_error=False so we handle the errors by ourselves
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login", auto_error=False)
 
 # ----- Token verification ----- #
 
@@ -44,15 +46,20 @@ async def get_current_user(
         raise ExceptionAuthentication_401()
 
     # Checks if the user is legit
-    user = await session.get(User, contents_model.sub)
+    get_user = GetUser()
+    get_user.base_existing()
+    get_user.get_by("id", contents_model.sub)
+
+    user = await get_user.get_one(session)
 
     # User data received is invalid
     if user is None:
         raise ExceptionAuthentication_401()
 
     # User account is invalid
-    if user.status is not UserStatus.ACTIVE:
+    if user.status is UserStatus.BANNED or user.status is UserStatus.DELETED:
         raise ExceptionInvalidAccount_403(user.status)
+
     return user
 
 

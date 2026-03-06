@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.security import get_hashed, verify_hashed
 from ..exceptions.core import (
     ExceptionAuthentication_401,
+    ExceptionInvalidStatus_409,
     ExceptionModifiedAdmin_403,
     ExceptionNotFound_404,
-    ExceptionStatusOverlap_409,
     ExceptionTakenUserEmail_409,
     ExceptionTakenUserName_409,
     ExceptionUnfinishedOrders_409,
@@ -83,13 +83,34 @@ async def read_user_service(session: AsyncSession, user_id: int) -> User:
     return user
 
 
+async def read_user_admin_service(session: AsyncSession, user_id: int) -> User:
+    get_user = GetUser()
+    get_user.base_all()
+    get_user.get_by("id", user_id)
+
+    user = await get_user.get_one(session)
+
+    if user is None:
+        raise ExceptionNotFound_404(ObjectType.USER, user_id)
+
+    return user
+
+
 # ----- User update ----- #
 
 
 async def update_account_service(
     user: User, session: AsyncSession, update_info: UserUpdate
 ) -> User:
-    user.sqlmodel_update(update_info.model_dump())
+    update = update_info.model_dump(exclude_unset=True)
+
+    # Overlapping info check.
+    if update.get("username") is not None:
+        await check_name_exists(update["username"], session)
+    if update.get("email") is not None:
+        await check_email_exists(update["email"], session)
+
+    user.sqlmodel_update(update)
 
     session.add(user)
     await session.commit()
@@ -152,21 +173,23 @@ async def change_user_ban_status_service(
     session: AsyncSession, user_id: int, ban: bool
 ) -> User:
     get_user = GetUser()
-    get_user.base_existing()
+    get_user.base_all()
     get_user.get_by("id", user_id)
 
     user = await get_user.get_one(session)
 
     if user is None:
         raise ExceptionNotFound_404(ObjectType.USER, user_id)
+    if user.status is UserStatus.DELETED:
+        raise ExceptionInvalidStatus_409(ObjectType.USER, user.status.value)
 
     if user.is_admin:
         raise ExceptionModifiedAdmin_403()
 
     if (user.status is UserStatus.BANNED and ban is True) or (
-        user.status is not UserStatus.BANNED is False and ban is False
+        user.status is not UserStatus.BANNED and ban is False
     ):
-        raise ExceptionStatusOverlap_409(ObjectType.USER)
+        raise ExceptionInvalidStatus_409(ObjectType.USER, user.status.value)
 
     if user.status is UserStatus.BANNED:
         user.status = UserStatus.ACTIVE

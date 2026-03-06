@@ -14,9 +14,12 @@ router = APIRouter()
 
 
 @router.post(
-    "/token",
+    "/login",
     response_model=TokenOutput,
-    responses={401: Responses.RESPONSE_401_UNAUTHORIZED},
+    responses={
+        401: Responses.RESPONSE_401_UNAUTHORIZED,
+        403: Responses.RESPONSE_403_FORBIDDEN,
+    },
 )
 async def login(
     user: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep

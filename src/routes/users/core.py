@@ -5,12 +5,19 @@ from fastapi import APIRouter, Body, status
 from ...core.database import SessionDep
 from ...core.dependencies import UserDep
 from ...exceptions.core import Responses
-from ...models_schemas.users import UserInput, UserOutput, UserOutputPrivate, UserUpdate
+from ...models_schemas.users import (
+    PasswordUpdate,
+    UserInput,
+    UserOutput,
+    UserOutputPrivate,
+    UserUpdate,
+)
 from ...services.users import (
     delete_user_service,
     read_user_service,
     register_user_service,
     update_account_service,
+    update_password_service,
 )
 
 router = APIRouter()
@@ -79,14 +86,16 @@ async def update_account(user: UserDep, session: SessionDep, update_info: UserUp
         403: Responses.RESPONSE_403_FORBIDDEN,
     },
 )
-async def update_password(user: UserDep, session: SessionDep, update_info: UserUpdate):
-    await update_password(user, session, update_info)
+async def update_password(
+    user: UserDep, session: SessionDep, update_info: PasswordUpdate
+):
+    await update_password_service(user, session, update_info)
 
 
 # ----- User delete ----- #
 
 
-@router.delete(
+@router.post(
     "/delete",
     response_model=UserOutputPrivate,
     responses={

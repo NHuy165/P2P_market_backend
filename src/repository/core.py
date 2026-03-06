@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Generic, TypeVar, get_type_hints
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from sqlalchemy import inspect
@@ -12,7 +12,6 @@ from ..exceptions.core import (
     ExceptionInvalidField_400,
     ExceptionRequest_400,
     ExceptionSortContradiction_400,
-    ExceptionType_400,
     ObjectType,
 )
 
@@ -102,16 +101,6 @@ class GetObject(Generic[ModelType]):
             attr = getattr(self.model, attr_str)
             self.query = self.query.options(selectinload(attr))
 
-    def eager_load_to_output_model(self, output_model: type[SQLModel]):
-        col_names = inspect(output_model).columns.keys()
-        attrs_str = []
-
-        for key in col_names:
-            if key in self.model_relationship_names:
-                attrs_str.append(key)
-
-        self.eager_load(attrs_str)
-
     def eager_load_all(self):
         mapper = inspect(self.model)
 
@@ -152,7 +141,9 @@ class GetObject(Generic[ModelType]):
                 criterion.value = adapter.validate_python(criterion.value)
 
             except ValidationError:
-                raise ExceptionType_400(str(attr_type))
+                raise ExceptionRequest_400(
+                    f"Criterion provided with false value type. Type expected: {str(attr_type)}"
+                )
 
             if criterion.op == CompareOperator.EQ:
                 self.query = self.query.where(attr == criterion.value)
