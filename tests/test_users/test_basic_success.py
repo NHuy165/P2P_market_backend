@@ -10,7 +10,7 @@ from src.models_schemas.users import (
     UserOutputPrivate,
     UserStatus,
 )
-from tests.utils import validator
+from tests.utils import response_validator_single
 
 # ----- User create and login ----- #
 
@@ -29,15 +29,11 @@ async def test_register_user(client: AsyncClient):
 
     response = await client.post("/users/register", json=user.model_dump())
 
-    validator(
+    response_validator_single(
         response,
         200,
         UserOutputPrivate,
-        {
-            "username": user.username,
-            "description": user.description,
-            "email": user.email,
-        },
+        user.model_dump(include={"username", "description", "email"}),
     )
 
 
@@ -53,7 +49,7 @@ async def test_login(client: AsyncClient, create_user):
         data={"username": "user1@gmail.com", "password": "user1-password"},
     )
 
-    validator(response, 200, TokenOutput, {"token_type": "bearer"})
+    response_validator_single(response, 200, TokenOutput, {"token_type": "bearer"})
 
 
 # ----- User read ----- #
@@ -71,7 +67,7 @@ async def test_read_user(authorized_client: AsyncClient, create_user):
         "/users/me",
     )
 
-    validator(response1, 200, UserOutputPrivate, {"username": "userA"})
+    response_validator_single(response1, 200, UserOutputPrivate, {"username": "userA"})
 
     # === View others' profiles === #
 
@@ -81,7 +77,12 @@ async def test_read_user(authorized_client: AsyncClient, create_user):
 
     response2 = await authorized_client.get(f"/users/{user1_id}")
 
-    validator(response2, 200, UserOutput, {"username": "user1"})
+    response_validator_single(
+        response2,
+        200,
+        UserOutput,
+        user1.model_dump(include=set(UserOutput.model_fields.keys())),
+    )
 
 
 async def test_read_user_admin(admin_client: AsyncClient, create_user):
@@ -95,7 +96,7 @@ async def test_read_user_admin(admin_client: AsyncClient, create_user):
 
     response = await admin_client.get(f"/admin/users/{user1_id}")
 
-    validator(response, 200, UserOutputPrivate, {"username": "user1"})
+    response_validator_single(response, 200, UserOutputPrivate, {"username": "user1"})
 
 
 # ----- User update ----- #
@@ -116,10 +117,7 @@ async def test_update_user(authorized_client: AsyncClient, update: dict):
 
     response = await authorized_client.patch("/users/update", json=update)
 
-    if update.get("username") == "userB":
-        validator(response, 200, UserOutputPrivate, {"username": "userB"})
-    if update.get("email") == "userB@gmail.com":
-        validator(response, 200, UserOutputPrivate, {"email": "userB@gmail.com"})
+    response_validator_single(response, 200, UserOutputPrivate, update)
 
 
 async def test_update_password(authorized_client: AsyncClient):
@@ -137,7 +135,7 @@ async def test_update_password(authorized_client: AsyncClient):
         "/users/change_password", json=update.model_dump()
     )
 
-    validator(response1, 204)
+    response_validator_single(response1, 204)
 
     # === Log in with new password === #
 
@@ -146,7 +144,7 @@ async def test_update_password(authorized_client: AsyncClient):
         data={"username": "userA@gmail.com", "password": "userA-new-password"},
     )
 
-    validator(response2, 200, TokenOutput, {"token_type": "bearer"})
+    response_validator_single(response2, 200, TokenOutput, {"token_type": "bearer"})
 
 
 # ----- User delete ----- #
@@ -162,7 +160,9 @@ async def test_delete_user(authorized_client: AsyncClient):
         json="userA-password",
     )
 
-    validator(response, 200, UserOutputPrivate, {"status": UserStatus.DELETED})
+    response_validator_single(
+        response, 200, UserOutputPrivate, {"status": UserStatus.DELETED}
+    )
 
 
 async def test_delete_user_admin(admin_client: AsyncClient, create_user):
@@ -178,10 +178,20 @@ async def test_delete_user_admin(admin_client: AsyncClient, create_user):
 
     response1 = await admin_client.delete(f"/admin/users/{user1_id}")
 
-    validator(response1, 200, UserOutputPrivate, {"status": UserStatus.BANNED})
+    response_validator_single(
+        response1,
+        200,
+        UserOutputPrivate,
+        user1.model_dump(include=set(UserOutput.model_fields.keys())),
+    )
 
     # === Unban ===
 
     response2 = await admin_client.post(f"/admin/users/{user1_id}")
 
-    validator(response2, 200, UserOutputPrivate, {"status": UserStatus.ACTIVE})
+    response_validator_single(
+        response2,
+        200,
+        UserOutputPrivate,
+        user1.model_dump(include=set(UserOutput.model_fields.keys())),
+    )

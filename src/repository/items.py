@@ -27,25 +27,22 @@ class GetItem(GetObject[Item]):
             raise ExceptionRequest_400(
                 f"{self.model.__name__} received new base type with existing one."
             )
+        self.query = self.query.where(
+            Item.status != ItemStatus.DELETED, Item.status != ItemStatus.BANNED
+        )
+        self.base = True
+
+    def base_existing(self):
+        if self.base:
+            raise ExceptionRequest_400(
+                f"{self.model.__name__} received new base type with existing one."
+            )
         self.query = self.query.where(Item.status != ItemStatus.DELETED)
         self.base = True
 
-    def base_admin(self):
+    def base_all(self):
         if self.base:
             raise ExceptionRequest_400(
                 f"{self.model.__name__} received new base type with existing one."
             )
         self.base = True
-
-    def base_custom(
-        self, criteria: list[Criterion] | list[CriterionInput] | None = None
-    ):
-        if self.base:
-            raise ExceptionRequest_400(
-                f"{self.model.__name__} received new base type with existing one."
-            )
-        self.base = True
-
-        if criteria is not None:
-            for crit in criteria:
-                self.apply_criterion(crit)

@@ -96,8 +96,8 @@ app.include_router(
 
 admin_router.include_router(
     orders.admin.router,
-    prefix="/items",
-    tags=["items"],
+    prefix="/orders",
+    tags=["orders"],
 )
 
 # ----- Transactions ----- #

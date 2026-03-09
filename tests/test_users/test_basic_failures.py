@@ -9,7 +9,7 @@ from src.models_schemas.users import (
     UserInput,
     UserStatus,
 )
-from tests.utils import validator
+from tests.utils import response_validator_single
 
 # ----- User create and login ----- #
 
@@ -44,7 +44,7 @@ async def test_register_user(
 
     response = await client.post("/users/register", json=user.model_dump())
 
-    validator(
+    response_validator_single(
         response, 409, ExceptionResponse, {"exception_type": exception_type.value}
     )
 
@@ -98,7 +98,7 @@ async def test_login(
         data={"username": username, "password": password},
     )
 
-    validator(
+    response_validator_single(
         response,
         status_code,
         ExceptionResponse,
@@ -116,7 +116,7 @@ async def test_read_user_admin(authorized_client: AsyncClient):
 
     response = await authorized_client.get("/admin/users/me")
 
-    validator(
+    response_validator_single(
         response,
         403,
         ExceptionResponse,
@@ -145,7 +145,7 @@ async def test_update_user(authorized_client: AsyncClient, update: dict):
 
     response = await authorized_client.patch("/users/update", json=update)
 
-    validator(
+    response_validator_single(
         response,
         400,
         ExceptionResponse,
@@ -166,7 +166,7 @@ async def test_update_password(authorized_client: AsyncClient):
         "/users/change_password", json=update.model_dump()
     )
 
-    validator(
+    response_validator_single(
         response,
         401,
         ExceptionResponse,
@@ -187,7 +187,7 @@ async def test_delete_user(authorized_client: AsyncClient):
         json="userA-wrong-password",
     )
 
-    validator(
+    response_validator_single(
         response,
         401,
         ExceptionResponse,
@@ -229,7 +229,7 @@ async def test_delete_user_admin(
 
     # Return model contents
     if status_code == 403:
-        validator(
+        response_validator_single(
             response,
             403,
             ExceptionResponse,
@@ -237,7 +237,7 @@ async def test_delete_user_admin(
         )
 
     else:
-        validator(
+        response_validator_single(
             response,
             409,
             ExceptionResponse,

@@ -44,8 +44,8 @@ async def read_private_item_one_admin(session: SessionDep, item_id: int):
 # ----- Item update (ADMIN) ----- #
 
 
-@router.delete(
-    "/{item_id}",
+@router.post(
+    "/{item_id}/ban",
     response_model=ItemOutputPrivateFull,
     responses={
         404: Responses.RESPONSE_404_NOT_FOUND,
@@ -57,12 +57,12 @@ async def ban_item(session: SessionDep, item_id: Annotated[int, Path()]):
 
 
 @router.post(
-    "/{item_id}",
+    "/{item_id}/unban",
     response_model=ItemOutputPrivateFull,
     responses={
         404: Responses.RESPONSE_404_NOT_FOUND,
         409: Responses.RESPONSE_409_CONFLICT,
     },
 )
-def unban_item(session: SessionDep, item_id: Annotated[int, Path()]):
-    return change_item_ban_status_service(session, item_id, False)
+async def unban_item(session: SessionDep, item_id: Annotated[int, Path()]):
+    return await change_item_ban_status_service(session, item_id, False)

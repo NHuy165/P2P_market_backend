@@ -53,8 +53,8 @@ async def read_private_items_many_service(
     user: User, session: AsyncSession, criteria: list[CriterionInput] = []
 ) -> list[Item]:
     get_item = GetItem()
-    get_item.base_private()
-    get_item.eager_load(["UserOutput"])
+    get_item.base_existing()
+    get_item.eager_load(["seller"])
     get_item.get_by("seller_id", user.id)
 
     items = await get_item.get_many(session, criteria)
@@ -73,14 +73,20 @@ async def read_private_items_many_admin_service(
     if user is None:
         raise ExceptionNotFound_404(ObjectType.USER, user_id)
 
-    return await read_private_items_many_service(user, session, criteria)
+    get_item = GetItem()
+    get_item.base_all()
+    get_item.eager_load(["seller"])
+    get_item.get_by("seller_id", user.id)
+
+    items = await get_item.get_many(session, criteria)
+    return items
 
 
 async def read_private_item_one_service(
     user: User, session: AsyncSession, item_id: int
 ) -> Item | None:
     get_item = GetItem()
-    get_item.base_private()
+    get_item.base_existing()
     get_item.eager_load_all()
     get_item.get_by("seller_id", user.id)
     get_item.get_by("id", item_id)
@@ -97,7 +103,7 @@ async def read_private_item_one_admin_service(
     session: AsyncSession, item_id: int
 ) -> Item | None:
     get_item = GetItem()
-    get_item.base_private()
+    get_item.base_all()
     get_item.eager_load_all()
     get_item.get_by("id", item_id)
 
@@ -114,7 +120,7 @@ async def read_public_items_many_service(
 ) -> list[Item]:
     get_item = GetItem()
     get_item.base_public()
-    get_item.eager_load(["UserOutput"])
+    get_item.eager_load(["seller"])
 
     items = await get_item.get_many(session, criteria)
     return items
@@ -125,7 +131,7 @@ async def read_public_item_one_service(
 ) -> Item | None:
     get_item = GetItem()
     get_item.base_public()
-    get_item.eager_load(["UserOutput"])
+    get_item.eager_load(["seller"])
     get_item.get_by("id", item_id)
 
     item = await get_item.get_one(session)
@@ -144,10 +150,7 @@ async def update_item_service(
 ) -> Item:
     # Cannot edit banned and deleted items.
     get_item = GetItem()
-    not_banned = CriterionGet("status", ItemStatus.BANNED, CompareOperator.NE)
-    not_deleted = CriterionGet("status", ItemStatus.DELETED, CompareOperator.NE)
-    get_item.base_custom(criteria=[not_banned, not_deleted])
-    get_item.eager_load(["seller"])
+    get_item.base_private()
     get_item.get_by("seller_id", user.id)
     get_item.get_by("id", item_id)
 
@@ -182,7 +185,7 @@ async def update_item_service(
 
     session.add(item)
     await session.commit()
-    await session.refresh(item, attribute_names=["orders"])
+    await session.refresh(item, attribute_names=["seller", "orders"])
 
     return item
 
@@ -226,7 +229,7 @@ async def delete_item_service(user: User, session: AsyncSession, item_id: int) -
 
     session.add(item)
     await session.commit()
-    await session.refresh(item)
+    await session.refresh(item, attribute_names=["seller"])
 
     return item
 
@@ -248,7 +251,7 @@ async def delete_items_all_service(user: User, session: AsyncSession) -> list[It
     session.add_all(items)
     await session.commit()
     for item in items:
-        await session.refresh(item)
+        await session.refresh(item, attribute_names=["seller"])
 
     return items
 
@@ -257,13 +260,16 @@ async def change_item_ban_status_service(
     session: AsyncSession, item_id: int, ban: bool
 ) -> Item:
     get_item = GetItem()
-    get_item.base_private()
+    get_item.base_all()
     get_item.get_by("id", item_id)
 
     item = await get_item.get_one(session, with_for_update=True)
 
     if item is None:
         raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+
+    if item.status is ItemStatus.DELETED:
+        raise ExceptionInvalidStatus_409(ObjectType.ITEM, ItemStatus.DELETED.value)
 
     if (item.status is ItemStatus.BANNED and ban is True) or (
         item.status is not ItemStatus.BANNED and ban is False
@@ -279,6 +285,6 @@ async def change_item_ban_status_service(
 
     session.add(item)
     await session.commit()
-    await session.refresh(item, attribute_names=["orders"])
+    await session.refresh(item, attribute_names=["seller", "orders"])
 
     return item

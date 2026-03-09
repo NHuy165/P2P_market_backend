@@ -3,3 +3,4 @@ venv/
 to_do.txt
 fixes.txt
 .vscode/
+__pycache__/

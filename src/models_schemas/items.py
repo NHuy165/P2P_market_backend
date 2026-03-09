@@ -3,7 +3,13 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
+from pydantic import BeforeValidator
 from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
+
+from src.exceptions.core import ExceptionRequest_400
+from src.models_schemas.utils import (
+    bvalidator_forbid_none,
+)
 
 if TYPE_CHECKING:
     from .orders import Order, OrderOutputNoType
@@ -17,9 +23,10 @@ class ItemStatus(Enum):
     DELETED = "DELETED"
 
 
-class ItemStatusRestricted(Enum):
-    ACTIVE = "ACTIVE"
-    SUSPENDED = "SUSPENDED"
+def bvalidator_limit_item_status(status: ItemStatus):
+    if status == ItemStatus.BANNED or status == ItemStatus.DELETED:
+        raise ExceptionRequest_400("Can only set item to ACTIVE or SUSPENDED.")
+    return status
 
 
 # ----- BASE ----- #
@@ -29,7 +36,7 @@ class ItemBase(SQLModel):
     name: Annotated[str, Field(min_length=1)]
     price: Annotated[Decimal, Field(sa_column=Column(Numeric(10, 2)), gt=0)]
     description: str | None = None
-    stock_quantity: Annotated[int, Field(ge=0)] = 0
+    stock_quantity: Annotated[int, Field(ge=0)]
 
 
 # ----- INPUT ----- #
@@ -37,7 +44,7 @@ class ItemBase(SQLModel):
 
 # Item creation
 class ItemInput(ItemBase):
-    status: ItemStatusRestricted
+    status: Annotated[ItemStatus, BeforeValidator(bvalidator_limit_item_status)]
 
 
 # ----- OUTPUT PUBLIC ----- #
@@ -74,14 +81,24 @@ class ItemOutputPrivateFull(ItemOutputPrivate):
 
 
 class ItemUpdate(ItemBase):
-    name: Annotated[str | None, Field(min_length=1)] = None
-    price: Annotated[Decimal | None, Field(gt=0)] = None
+    name: Annotated[
+        str | None, BeforeValidator(bvalidator_forbid_none), Field(min_length=1)
+    ] = None
+    price: Annotated[
+        Decimal | None, BeforeValidator(bvalidator_forbid_none), Field(gt=0)
+    ] = None
     description: str | None = None
-    stock_quantity: Annotated[int | None, Field(ge=0)] = None
-    stock_quantity_relative: int | None = None
+    stock_quantity: Annotated[
+        int | None, BeforeValidator(bvalidator_forbid_none), Field(ge=0)
+    ] = None
+    stock_quantity_relative: Annotated[
+        int | None, BeforeValidator(bvalidator_forbid_none)
+    ] = None
 
-    status: ItemStatusRestricted | None = None
-    # is_deleted: bool | None = None (item deletion is done via a separate request)
+    status: Annotated[
+        ItemStatus | None,
+        BeforeValidator(bvalidator_limit_item_status, bvalidator_forbid_none),
+    ] = None
 
 
 # ----- DATABASE ----- #

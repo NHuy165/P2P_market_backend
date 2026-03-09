@@ -3,11 +3,10 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
-from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, BeforeValidator, EmailStr
 from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
-from src.exceptions.core import ExceptionRequest_400
+from src.models_schemas.utils import bvalidator_forbid_none
 
 if TYPE_CHECKING:
     from .items import Item
@@ -82,19 +81,17 @@ class UserGet(BaseModel):
 
 
 # User is not allowed to explicitly set the value to None.
-def forbid_none(s):
-    if s is None:
-        raise ExceptionRequest_400("Request validation failed.")
-    return s
 
 
 class UserUpdate(UserBase):
     username: Annotated[
         str | None,
-        BeforeValidator(forbid_none),
+        BeforeValidator(bvalidator_forbid_none),
         Field(min_length=1),
     ] = None
-    email: Annotated[EmailStr | None, BeforeValidator(forbid_none), Field()] = None
+    email: Annotated[
+        EmailStr | None, BeforeValidator(bvalidator_forbid_none), Field()
+    ] = None
     description: str | None = None
 
     # is_deleted: bool | None = None (user deletion is done via a separate request)
