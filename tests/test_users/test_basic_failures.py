@@ -1,3 +1,6 @@
+from types import CoroutineType
+from typing import Any, Callable
+
 import pytest
 from httpx import AsyncClient
 from pydantic import EmailStr
@@ -23,7 +26,7 @@ from tests.utils import response_validator_single
 )
 async def test_register_user(
     client: AsyncClient,
-    create_user,
+    create_user: Callable[..., CoroutineType[Any, Any, User]],
     username: str,
     email: EmailStr,
     exception_type: ExceptionType,
@@ -77,7 +80,7 @@ async def test_register_user(
 )
 async def test_login(
     client: AsyncClient,
-    create_user,
+    create_user: Callable[..., CoroutineType[Any, Any, User]],
     username: str,
     password: str,
     status_code: int,
@@ -196,50 +199,56 @@ async def test_delete_user(authorized_client: AsyncClient):
 
 
 @pytest.mark.parametrize(
-    "status_code, user_status, is_admin",
+    "user_status, is_admin, status_code, exception_type",
     [
-        (403, UserStatus.ACTIVE, True),  # ban
-        (409, UserStatus.BANNED, False),  # ban
-        (409, UserStatus.ACTIVE, False),  # unban
-        (409, UserStatus.DELETED, False),  # ban
+        (UserStatus.ACTIVE, True, 403, ExceptionType.MODIFIED_ADMIN),
+        (UserStatus.BANNED, False, 409, ExceptionType.INVALID_STATUS),
+        (UserStatus.DELETED, False, 409, ExceptionType.INVALID_STATUS),
     ],
 )
-async def test_delete_user_admin(
+async def test_ban_user(
     admin_client: AsyncClient,
-    create_user,
-    status_code: int,
+    create_user: Callable[..., CoroutineType[Any, Any, User]],
     user_status: UserStatus,
     is_admin: bool,
+    status_code: int,
+    exception_type: ExceptionType,
 ):
     """
     Fails to ban an admin account.
     Fails to ban an already banned account.
-    Fails to unban an active account.
     Fails to ban a deleted account.
     """
 
     user1 = await create_user("user1", status=user_status, is_admin=is_admin)
-    assert isinstance(user1, User)
     user1_id = user1.id
 
-    if user_status == UserStatus.ACTIVE and not is_admin:
-        response = await admin_client.post(f"/admin/users/{user1_id}")
-    else:
-        response = await admin_client.delete(f"/admin/users/{user1_id}")
+    response = await admin_client.post(f"/admin/users/{user1_id}/ban")
 
-    # Return model contents
-    if status_code == 403:
-        response_validator_single(
-            response,
-            403,
-            ExceptionResponse,
-            {"exception_type": ExceptionType.MODIFIED_ADMIN.value},
-        )
+    response_validator_single(
+        response,
+        status_code,
+        ExceptionResponse,
+        {"exception_type": exception_type.value},
+    )
 
-    else:
-        response_validator_single(
-            response,
-            409,
-            ExceptionResponse,
-            {"exception_type": ExceptionType.INVALID_STATUS.value},
-        )
+
+async def test_unban_user(
+    admin_client: AsyncClient,
+    create_user: Callable[..., CoroutineType[Any, Any, User]],
+):
+    """
+    Fails to unban an active account.
+    """
+
+    user1 = await create_user("user1")
+    user1_id = user1.id
+
+    response = await admin_client.post(f"/admin/users/{user1_id}/unban")
+
+    response_validator_single(
+        response,
+        409,
+        ExceptionResponse,
+        {"exception_type": ExceptionType.INVALID_STATUS.value},
+    )

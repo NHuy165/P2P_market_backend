@@ -25,7 +25,13 @@ def response_validator_single(
     contents: dict[str, Any] = {},
 ) -> None:
     # Status code
-    assert response.status_code == status_code
+    try:
+        assert response.status_code == status_code
+    except:
+        print("CURRENTLY:", response.status_code)
+        print("CORRECT:", status_code)
+
+        raise
 
     # Return model
     if model is not None:

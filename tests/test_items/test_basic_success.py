@@ -310,8 +310,8 @@ async def test_read_public_item_one(
             {"name": "item2", "price": Decimal("6.57")},
         ),
         ({"status": ItemStatus.SUSPENDED.value}, {"status": ItemStatus.SUSPENDED}),
-        ({"stock_quantity": 20}, {"stock_quantity": 20}),
-        ({"stock_quantity_relative": -5}, {"stock_quantity": 5}),
+        ({"stock_quantity": 0}, {"stock_quantity": 0}),
+        ({"stock_quantity_relative": -10}, {"stock_quantity": 0}),
     ],
 )
 async def test_update_item(
@@ -446,7 +446,7 @@ async def test_unban_item(
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
 ):
     """
-    Unbans an unbanned item.
+    Unbans an item.
     """
 
     user1 = await create_user("user1")

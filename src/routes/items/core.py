@@ -161,6 +161,7 @@ async def suspend_items_all(user: UserDep, session: SessionDep):
         401: Responses.RESPONSE_401_UNAUTHORIZED,
         403: Responses.RESPONSE_403_FORBIDDEN,
         404: Responses.RESPONSE_404_NOT_FOUND,
+        409: Responses.RESPONSE_409_CONFLICT,
     },
 )
 async def delete_item(user: UserDep, session: SessionDep, item_id: int):

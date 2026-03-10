@@ -1,32 +1,19 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from enum import Enum
 from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BeforeValidator
+from pydantic import AfterValidator, BeforeValidator
 from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
-from src.exceptions.core import ExceptionRequest_400
+from src.models_schemas.enums import ItemStatus
 from src.models_schemas.utils import (
+    avalidator_limit_item_status,
     bvalidator_forbid_none,
 )
 
 if TYPE_CHECKING:
     from .orders import Order, OrderOutputNoType
     from .users import User, UserOutput
-
-
-class ItemStatus(Enum):
-    ACTIVE = "ACTIVE"
-    SUSPENDED = "SUSPENDED"
-    BANNED = "BANNED"
-    DELETED = "DELETED"
-
-
-def bvalidator_limit_item_status(status: ItemStatus):
-    if status == ItemStatus.BANNED or status == ItemStatus.DELETED:
-        raise ExceptionRequest_400("Can only set item to ACTIVE or SUSPENDED.")
-    return status
 
 
 # ----- BASE ----- #
@@ -44,7 +31,7 @@ class ItemBase(SQLModel):
 
 # Item creation
 class ItemInput(ItemBase):
-    status: Annotated[ItemStatus, BeforeValidator(bvalidator_limit_item_status)]
+    status: Annotated[ItemStatus, AfterValidator(avalidator_limit_item_status)]
 
 
 # ----- OUTPUT PUBLIC ----- #
@@ -97,7 +84,8 @@ class ItemUpdate(ItemBase):
 
     status: Annotated[
         ItemStatus | None,
-        BeforeValidator(bvalidator_limit_item_status, bvalidator_forbid_none),
+        BeforeValidator(bvalidator_forbid_none),
+        AfterValidator(avalidator_limit_item_status),
     ] = None
 
 

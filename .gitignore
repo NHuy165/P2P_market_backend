@@ -2,5 +2,6 @@ venv/
 .env
 to_do.txt
 fixes.txt
+structure.txt
 .vscode/
 __pycache__/

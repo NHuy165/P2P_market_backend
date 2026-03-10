@@ -6,18 +6,13 @@ from typing import TYPE_CHECKING, Annotated
 from pydantic import BaseModel, BeforeValidator, EmailStr
 from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
+from src.models_schemas.enums import UserStatus
 from src.models_schemas.utils import bvalidator_forbid_none
 
 if TYPE_CHECKING:
     from .items import Item
     from .orders import Order
     from .transactions import Transaction
-
-
-class UserStatus(Enum):
-    ACTIVE = "ACTIVE"
-    BANNED = "BANNED"
-    DELETED = "DELETED"
 
 
 # ----- BASE ----- #

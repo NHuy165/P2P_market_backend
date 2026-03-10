@@ -1,3 +1,6 @@
+from types import CoroutineType
+from typing import Any, Callable
+
 import pytest
 from httpx import AsyncClient
 
@@ -37,7 +40,9 @@ async def test_register_user(client: AsyncClient):
     )
 
 
-async def test_login(client: AsyncClient, create_user):
+async def test_login(
+    client: AsyncClient, create_user: Callable[..., CoroutineType[Any, Any, User]]
+):
     """
     Logs in successfully.
     """
@@ -55,7 +60,10 @@ async def test_login(client: AsyncClient, create_user):
 # ----- User read ----- #
 
 
-async def test_read_user(authorized_client: AsyncClient, create_user):
+async def test_read_user(
+    authorized_client: AsyncClient,
+    create_user: Callable[..., CoroutineType[Any, Any, User]],
+):
     """
     Views own profile using a logged in user.
     Views another profile using a logged in user.
@@ -85,13 +93,14 @@ async def test_read_user(authorized_client: AsyncClient, create_user):
     )
 
 
-async def test_read_user_admin(admin_client: AsyncClient, create_user):
+async def test_read_user_admin(
+    admin_client: AsyncClient, create_user: Callable[..., CoroutineType[Any, Any, User]]
+):
     """
     Views a deleted profile as an admin.
     """
 
     user1 = await create_user("user1", status=UserStatus.DELETED)
-    assert isinstance(user1, User)
     user1_id = user1.id
 
     response = await admin_client.get(f"/admin/users/{user1_id}")
@@ -165,33 +174,41 @@ async def test_delete_user(authorized_client: AsyncClient):
     )
 
 
-async def test_delete_user_admin(admin_client: AsyncClient, create_user):
+async def test_ban_user(
+    admin_client: AsyncClient, create_user: Callable[..., CoroutineType[Any, Any, User]]
+):
     """
-    Bans and unbans a user without any items or orders.
+    Bans a user who has no item or order.
     """
 
     user1 = await create_user("user1")
-    assert isinstance(user1, User)
     user1_id = user1.id
 
-    # === Ban ===
-
-    response1 = await admin_client.delete(f"/admin/users/{user1_id}")
+    response1 = await admin_client.post(f"/admin/users/{user1_id}/ban")
 
     response_validator_single(
         response1,
         200,
         UserOutputPrivate,
-        user1.model_dump(include=set(UserOutput.model_fields.keys())),
+        {"status": UserStatus.BANNED.value},
     )
 
-    # === Unban ===
 
-    response2 = await admin_client.post(f"/admin/users/{user1_id}")
+async def test_unban_user(
+    admin_client: AsyncClient, create_user: Callable[..., CoroutineType[Any, Any, User]]
+):
+    """
+    Unbans a user who has no item or order.
+    """
+
+    user1 = await create_user("user1", status=UserStatus.BANNED)
+    user1_id = user1.id
+
+    response1 = await admin_client.post(f"/admin/users/{user1_id}/unban")
 
     response_validator_single(
-        response2,
+        response1,
         200,
         UserOutputPrivate,
-        user1.model_dump(include=set(UserOutput.model_fields.keys())),
+        {"status": UserStatus.ACTIVE.value},
     )

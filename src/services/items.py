@@ -16,7 +16,7 @@ from ..models_schemas.items import (
     ItemUpdate,
 )
 from ..models_schemas.users import User
-from ..repository.core import CompareOperator, CriterionGet, CriterionInput
+from ..repository.core import CriterionInput
 from ..repository.items import GetItem
 from ..repository.users import GetUser
 
@@ -150,7 +150,7 @@ async def update_item_service(
 ) -> Item:
     # Cannot edit banned and deleted items.
     get_item = GetItem()
-    get_item.base_private()
+    get_item.base_existing()
     get_item.get_by("seller_id", user.id)
     get_item.get_by("id", item_id)
 
@@ -158,6 +158,9 @@ async def update_item_service(
 
     if item is None:
         raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+
+    if item.status is ItemStatus.BANNED:
+        raise ExceptionInvalidStatus_409(ObjectType.ITEM, ItemStatus.BANNED)
 
     # Negative relative quantity
     if (
@@ -214,7 +217,7 @@ async def suspend_items_all_service(user: User, session: AsyncSession) -> list[I
 
 async def delete_item_service(user: User, session: AsyncSession, item_id: int) -> Item:
     get_item = GetItem()
-    get_item.base_private()
+    get_item.base_existing()
     get_item.get_by("seller_id", user.id)
     get_item.get_by("id", item_id)
 
@@ -222,6 +225,9 @@ async def delete_item_service(user: User, session: AsyncSession, item_id: int) -
 
     if item is None:
         raise ExceptionNotFound_404(ObjectType.ITEM, item_id)
+
+    if item.status is ItemStatus.BANNED:
+        raise ExceptionInvalidStatus_409(ObjectType.ITEM, ItemStatus.BANNED)
 
     # Soft delete so pending orders still have to get delivered.
     item.status = ItemStatus.DELETED
@@ -239,12 +245,14 @@ async def delete_items_all_service(user: User, session: AsyncSession) -> list[It
     This function is automatically called upon user deletion.
     """
     get_item = GetItem()
-    get_item.base_private()
+    get_item.base_existing()
     get_item.get_by("seller_id", user.id)
 
     items = await get_item.get_many(session, with_for_update=True)
 
     for item in items:
+        if item.status is ItemStatus.BANNED:
+            raise ExceptionInvalidStatus_409(ObjectType.ITEM, ItemStatus.BANNED)
         item.status = ItemStatus.DELETED
         item.deleted_at = datetime.now(timezone.utc)
 

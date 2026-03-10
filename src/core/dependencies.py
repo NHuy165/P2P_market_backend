@@ -58,7 +58,7 @@ async def get_current_user(
 
     # User account is invalid
     if user.status is UserStatus.BANNED or user.status is UserStatus.DELETED:
-        raise ExceptionInvalidAccount_403(user.status)
+        raise ExceptionInvalidAccount_403(user.status.value)
 
     return user
 

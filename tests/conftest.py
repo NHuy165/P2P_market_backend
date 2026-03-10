@@ -12,7 +12,6 @@ from src.core.security import get_hashed
 from src.main import app
 from src.models_schemas.items import Item, ItemInput, ItemStatus
 from src.models_schemas.users import User, UserStatus
-from src.services.items import create_item_service
 
 # ----- ESSENTIAL DATABASE SETUP ----- #
 

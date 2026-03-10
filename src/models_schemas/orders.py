@@ -5,17 +5,12 @@ from typing import TYPE_CHECKING, Annotated
 
 from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
+from src.models_schemas.enums import OrderStatus
+
 if TYPE_CHECKING:
     from .items import Item, ItemOutputPublic
     from .transactions import Transaction
     from .users import User, UserOutput
-
-
-class OrderStatus(str, Enum):
-    PENDING = "PENDING"
-    CANCELLED = "CANCELLED"
-    SHIPPED = "SHIPPED"
-    DELIVERED = "DELIVERED"
 
 
 # ----- BASE ----- #

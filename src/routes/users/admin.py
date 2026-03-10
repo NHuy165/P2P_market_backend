@@ -26,8 +26,8 @@ async def read_account_admin(session: SessionDep, user_id: int):
 # ----- User delete (ADMIN) ----- #
 
 
-@router.delete(
-    "/{user_id}",
+@router.post(
+    "/{user_id}/ban",
     response_model=UserOutputPrivate,
     responses={
         404: Responses.RESPONSE_404_NOT_FOUND,
@@ -40,7 +40,7 @@ async def ban_account(session: SessionDep, user_id: int):
 
 
 @router.post(
-    "/{user_id}",
+    "/{user_id}/unban",
     response_model=UserOutputPrivate,
     responses={
         404: Responses.RESPONSE_404_NOT_FOUND,

@@ -5,25 +5,11 @@ from typing import TYPE_CHECKING, Annotated, Optional
 
 from sqlmodel import Column, DateTime, Field, Numeric, Relationship, SQLModel
 
+from src.models_schemas.enums import TransactionStatus, TransactionType
+
 if TYPE_CHECKING:
     from .orders import Order
     from .users import User
-
-
-class TransactionType(str, Enum):
-    DEPOSIT = "DEPOSIT"
-    WITHDRAWAL = "WITHDRAWAL"
-    SALE = "SALE"
-    PURCHASE = "PURCHASE"
-    REFUND = "REFUND"
-    ADMIN_ADD = "ADMIN_ADD"
-    ADMIN_SUBTRACT = "ADMIN_SUBTRACT"
-
-
-class TransactionStatus(str, Enum):
-    ON_HOLD = "ON_HOLD"
-    SUCCESS = "SUCCESS"
-    FAILED = "FAILED"
 
 
 # ----- BASE ----- #
