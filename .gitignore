@@ -1,7 +1,13 @@
 venv/
+
+.vscode/
+.pytest_cache/
+.ruff_cache/
+
+__pycache__/
+
 .env
+
 to_do.txt
 fixes.txt
 structure.txt
-.vscode/
-__pycache__/

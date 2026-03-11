@@ -8,6 +8,8 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import SQLModel, col
 from sqlmodel.sql.expression import SelectOfScalar
 
+from src.models_schemas.enums import CompareOperator
+
 from ..exceptions.core import (
     ExceptionInvalidField_400,
     ExceptionRequest_400,
@@ -16,17 +18,6 @@ from ..exceptions.core import (
 )
 
 # ----- Criterion classes ----- #
-
-
-class CompareOperator(str, Enum):
-    EQ = "eq"
-    NE = "ne"
-
-    GT = "gt"
-    GE = "ge"
-
-    LT = "lt"
-    LE = "le"
 
 
 class Criterion:

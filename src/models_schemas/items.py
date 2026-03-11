@@ -57,6 +57,7 @@ class ItemOutputPublic(ItemOutputNoSeller):
 # Item shown to account owner and admins
 class ItemOutputPrivate(ItemOutputPublic):
     status: ItemStatus
+    deleted_at: datetime | None
     banned_at: datetime | None
 
 

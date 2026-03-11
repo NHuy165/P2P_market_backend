@@ -35,3 +35,14 @@ class TransactionStatus(str, Enum):
     ON_HOLD = "ON_HOLD"
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
+
+
+class CompareOperator(str, Enum):
+    EQ = "eq"
+    NE = "ne"
+
+    GT = "gt"
+    GE = "ge"
+
+    LT = "lt"
+    LE = "le"

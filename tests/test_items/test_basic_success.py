@@ -5,6 +5,7 @@ from typing import Any, Callable
 import pytest
 from httpx import AsyncClient
 
+from src.models_schemas.enums import CompareOperator
 from src.models_schemas.items import (
     Item,
     ItemInput,
@@ -244,7 +245,8 @@ async def test_read_public_items_all(
 
     # === Viewing as user1 === #
 
-    await quick_login("user1")
+    token = await quick_login("user1")
+    client.headers.update(token)
 
     response2 = await client.post("items")
 
@@ -286,7 +288,8 @@ async def test_read_public_item_one(
 
     # === Viewing user1's item1 as user1 === #
 
-    await quick_login("user1")
+    token = await quick_login("user1")
+    client.headers.update(token)
 
     response2 = await client.get(f"/items/{item1_id}")
 
@@ -408,7 +411,10 @@ async def test_delete_item(
     response = await authorized_client.delete(f"/items/{item1_id}")
 
     response_validator_single(
-        response, 200, ItemOutputPrivate, {"status": ItemStatus.DELETED}
+        response,
+        200,
+        ItemOutputPrivate,
+        {"status": ItemStatus.DELETED, "deleted_at": (None, CompareOperator.NE)},
     )
 
 
@@ -436,7 +442,10 @@ async def test_ban_item(
     response = await admin_client.post(f"/admin/items/{item1_id}/ban")
 
     response_validator_single(
-        response, 200, ItemOutputPrivateFull, {"status": ItemStatus.BANNED}
+        response,
+        200,
+        ItemOutputPrivateFull,
+        {"status": ItemStatus.BANNED, "banned_at": (None, CompareOperator.NE)},
     )
 
 
@@ -456,5 +465,8 @@ async def test_unban_item(
     response = await admin_client.post(f"/admin/items/{item1_id}/unban")
 
     response_validator_single(
-        response, 200, ItemOutputPrivateFull, {"status": ItemStatus.SUSPENDED}
+        response,
+        200,
+        ItemOutputPrivateFull,
+        {"status": ItemStatus.SUSPENDED, "banned_at": None},
     )

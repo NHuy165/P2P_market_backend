@@ -60,7 +60,7 @@ async def complete_order(session: SessionDep, order_id: int):
 
 @router.delete(
     "/{order_id}",
-    response_model=OrderOutput,
+    response_model=OrderOutputNoType,
     responses={
         404: Responses.RESPONSE_404_NOT_FOUND,
         409: Responses.RESPONSE_409_CONFLICT,

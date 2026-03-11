@@ -1,8 +1,9 @@
 from decimal import Decimal
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import NullPool
+from sqlalchemy import NullPool, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlmodel import SQLModel
 
@@ -11,7 +12,10 @@ from src.core.database import get_async_session
 from src.core.security import get_hashed
 from src.main import app
 from src.models_schemas.items import Item, ItemInput, ItemStatus
+from src.models_schemas.orders import OrderOutputNoType
+from src.models_schemas.transactions import Transaction
 from src.models_schemas.users import User, UserStatus
+from src.services.transactions import read_transactions_service
 
 # ----- ESSENTIAL DATABASE SETUP ----- #
 
@@ -42,21 +46,23 @@ async def session_fixture():
     await reset_database()
 
 
-@pytest.fixture(name="client")
-async def client_fixture(session: AsyncSession):
+@pytest.fixture(name="app")
+async def app_fixture(session: AsyncSession):
     # Overrides get session function
-    def get_async_session_override():
-        return session
+    app.dependency_overrides[get_async_session] = lambda: session
 
-    app.dependency_overrides[get_async_session] = get_async_session_override
-
-    transport = ASGITransport(app)
-    # Returns the async client
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    yield app
 
     # Cleanup (clear dependency override)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(name="client")
+async def client_fixture(app: FastAPI):
+    transport = ASGITransport(app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
 
 # ----- UTILITY FIXTURES ----- #
@@ -67,7 +73,10 @@ async def client_fixture(session: AsyncSession):
 @pytest.fixture(name="create_user")
 async def create_fixture(session: AsyncSession):
     async def create_user(
-        username: str, status: UserStatus = UserStatus.ACTIVE, is_admin: bool = False
+        username: str,
+        status: UserStatus = UserStatus.ACTIVE,
+        is_admin: bool = False,
+        balance: Decimal = Decimal("0"),
     ) -> User:
         user = User(
             username=username,
@@ -76,6 +85,7 @@ async def create_fixture(session: AsyncSession):
             hashed_password=get_hashed(username + "-password"),
             status=status,
             is_admin=is_admin,
+            balance=balance,
         )
         session.add(user)
         await session.commit()
@@ -119,7 +129,7 @@ async def create_item_fixture(session: AsyncSession):
 
 @pytest.fixture(name="quick_login")
 async def quick_login_fixture(client: AsyncClient):
-    async def quick_login(username: str) -> None:
+    async def quick_login(username: str) -> dict:
         token = await client.post(
             "/login",
             data={
@@ -130,86 +140,97 @@ async def quick_login_fixture(client: AsyncClient):
 
         token = token.json()["access_token"]
 
-        client.headers.update({"Authorization": "Bearer " + token})
+        return {"Authorization": "Bearer " + token}
 
     return quick_login
 
 
 @pytest.fixture(name="userA")
 async def userA(create_user):
+    """
+    Sometimes we need the user object itself in tests.
+    """
+
     user = await create_user("userA")
 
     return user
 
 
 @pytest.fixture(name="authorized_client")
-async def authorized_client_fixture(client: AsyncClient, userA: User, quick_login):
-    await quick_login("userA")
+async def authorized_client_fixture(app: FastAPI, userA: User, quick_login):
+    token = await quick_login("userA")
 
-    return client
+    transport = ASGITransport(app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers.update(token)
+        yield ac
 
 
 @pytest.fixture(name="admin_client")
-async def authorized_admin_client_fixture(
-    client: AsyncClient, create_user, quick_login
-):
+async def authorized_admin_client_fixture(app: FastAPI, create_user, quick_login):
     await create_user("admin", is_admin=True)
-    await quick_login("admin")
+    token = await quick_login("admin")
 
-    return client
+    transport = ASGITransport(app)
+
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers.update(token)
+        yield ac
 
 
-# === Scenario utility === #
+# === Miscellaneous utility === #
 
 
-@pytest.fixture(name="users_with_items")
-async def users_with_items_fixture(client: AsyncClient, create_user, create_item):
-    async def users_with_items(
-        n_users: int = 1,
-        n_items: int = 1,
-    ):
-        """
-        Creates n_users users for each user status and n_items items for each item status for each user.
-        """
+@pytest.fixture(name="change_money")
+async def change_money_fixture(session: AsyncSession):
+    """
+    This function does not have any auto-validation mechanic.
+    """
 
-        users = []
+    async def change_money(user: User, amount: Decimal):
+        await session.refresh(user)
 
-        for user_status in UserStatus:
-            # Creates n_users for each user status
-            for i in range(1, n_users + 1):
-                user = await create_user(
-                    username=f"user{i}-{user_status.value}", status=user_status
-                )
+        user.balance += amount
 
-                users.append(user)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
 
-                # All users
-                for item_status in (ItemStatus.BANNED, ItemStatus.DELETED):
-                    for j in range(1, n_items + 1):
-                        await create_item(
-                            name=f"item{j}-{i}-{item_status.value}",
-                            seller=user,
-                            status=item_status,
-                        )
+        return user
 
-                # BANNED users or ACTIVE users
-                if user_status == UserStatus.ACTIVE or user_status == UserStatus.BANNED:
-                    for j in range(1, n_items + 1):
-                        await create_item(
-                            name=f"item{j}-{i}-{ItemStatus.SUSPENDED.value}",
-                            seller=user,
-                            status=ItemStatus.SUSPENDED,
-                        )
+    return change_money
 
-                # Only ACTIVE users
-                if user_status == UserStatus.ACTIVE:
-                    for j in range(1, n_items + 1):
-                        await create_item(
-                            name=f"item{j}-{i}-{ItemStatus.ACTIVE.value}",
-                            seller=user,
-                            status=ItemStatus.ACTIVE,
-                        )
 
-        return users
+@pytest.fixture(name="fetch_transactions")
+async def fetch_transactions_fixture(session: AsyncSession):
+    async def fetch_transactions() -> list[Transaction]:
+        result = await session.execute(select(Transaction))
+        transactions = result.scalars().all()
 
-    return users_with_items
+        return list(transactions)
+
+    return fetch_transactions
+
+
+@pytest.fixture(name="complete_order")
+async def complete_order_fixture(admin_client: AsyncClient):
+    async def complete_order(order_id: int):
+        await admin_client.patch(f"/admin/orders/{order_id}/approve")
+        await admin_client.patch(f"/admin/orders/{order_id}/complete")
+
+    return complete_order
+
+
+@pytest.fixture(name="quickbuy")
+async def quickbuy_fixture():
+    async def quickbuy(
+        custom_client: AsyncClient, item_id: int, quantity: int
+    ) -> OrderOutputNoType:
+        order = await custom_client.post(
+            "/orders/create", json={"quantity": quantity, "item_id": item_id}
+        )
+
+        return OrderOutputNoType.model_validate(order.json())
+
+    return quickbuy

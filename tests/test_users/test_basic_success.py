@@ -5,6 +5,7 @@ import pytest
 from httpx import AsyncClient
 
 from src.models_schemas.auth import TokenOutput
+from src.models_schemas.enums import CompareOperator
 from src.models_schemas.users import (
     PasswordUpdate,
     User,
@@ -190,7 +191,7 @@ async def test_ban_user(
         response1,
         200,
         UserOutputPrivate,
-        {"status": UserStatus.BANNED.value},
+        {"status": UserStatus.BANNED.value, "banned_at": (None, CompareOperator.NE)},
     )
 
 

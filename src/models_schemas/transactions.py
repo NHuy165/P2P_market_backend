@@ -51,7 +51,7 @@ class TransactionOutput(TransactionBase):
 class Transaction(TransactionBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
 
-    order_id: Annotated[int | None, Field(foreign_key="order.id", unique=True)] = None
+    order_id: Annotated[int | None, Field(foreign_key="order.id")] = None
     user_id: Annotated[int | None, Field(foreign_key="user.id", nullable=False)] = None
 
     type: TransactionType
