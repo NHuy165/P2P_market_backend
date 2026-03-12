@@ -56,7 +56,7 @@ def response_validator_single(
 
 
 def validate_results(
-    data: list[BaseModel] | list[dict],
+    data: list,
     columns: list[str],
     correct: set[frozenset],
     validate: type[BaseModel] | None = None,

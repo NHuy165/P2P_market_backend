@@ -236,12 +236,13 @@ async def approve_order_service(session: AsyncSession, order_id: int) -> Order:
     get_order = GetOrder()
     get_order.base_none()
     get_order.get_by("id", order_id)
-    get_order.get_by("status", OrderStatus.PENDING)
 
     order = await get_order.get_one(session, with_for_update=True)
 
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
+    if order.status is not OrderStatus.PENDING:
+        raise ExceptionInvalidStatus_409(ObjectType.ORDER, status=order.status.value)
 
     order.status = OrderStatus.SHIPPED
 
@@ -257,12 +258,13 @@ async def complete_order_service(session: AsyncSession, order_id: int) -> Order:
     get_order.base_none()
     get_order.eager_load(["transactions"])
     get_order.get_by("id", order_id)
-    get_order.get_by("status", OrderStatus.SHIPPED)
 
     order = await get_order.get_one(session, with_for_update=True)
 
     if order is None:
         raise ExceptionNotFound_404(ObjectType.ORDER, order_id)
+    if order.status is not OrderStatus.SHIPPED:
+        raise ExceptionInvalidStatus_409(ObjectType.ORDER, status=order.status.value)
 
     # Completion logic
     order.status = OrderStatus.DELIVERED

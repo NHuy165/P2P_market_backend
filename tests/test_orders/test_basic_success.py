@@ -43,6 +43,7 @@ async def test_create_finish_order(
         name="item1", seller=user1, price=Decimal("5"), stock_quantity=2
     )
     item1_id = item1.id
+    assert item1_id is not None
 
     order = OrderInput(quantity=2, item_id=item1_id)
 
@@ -115,7 +116,17 @@ async def test_create_finish_order(
 # ----- Order read ----- #
 
 
-@pytest.mark.parametrize("admin", [False, True])
+@pytest.mark.parametrize(
+    "admin, type",
+    [
+        (False, None),
+        (False, True),
+        (False, False),
+        (True, None),
+        (True, True),
+        (True, False),
+    ],
+)
 async def test_read_orders(
     authorized_client: AsyncClient,
     admin_client: AsyncClient,
@@ -126,12 +137,13 @@ async def test_read_orders(
     quick_login: Callable[..., CoroutineType[Any, Any, dict]],
     quickbuy: Callable[..., CoroutineType[Any, Any, OrderOutputNoType]],
     admin: bool,
+    type: bool | None,
 ):
     """
     Reads private buy orders and sell orders as a user and as an admin.
     """
 
-    # Setup
+    # Setup: user1 has item1 and item2, userA has item3. Each user buys everything from the other one.
 
     user1 = await create_user("user1")
 
@@ -176,19 +188,28 @@ async def test_read_orders(
     # Validate
 
     if admin:
-        response = await admin_client.post(f"/admin/orders/{userA.id}")
+        response = await admin_client.post(
+            f"/admin/orders/{userA.id}{'?type=' + str(type) if isinstance(type, bool) else ''}"
+        )
     else:
-        response = await authorized_client.post("/orders")
+        response = await authorized_client.post(
+            f"/orders{'?type=' + str(type) if isinstance(type, bool) else ''}"
+        )
 
     response_validator_single(response, 200)
 
     response_body = response.json()
 
-    correct = {
-        frozenset(("BUY", user1.id, userA.id, item1.id, Decimal("1"))),
-        frozenset(("BUY", user1.id, userA.id, item2.id, Decimal("2"))),
-        frozenset(("SELL", userA.id, user1.id, item3.id, Decimal("3"))),
-    }
+    correct = set()
+    if type is True:
+        correct.add(frozenset(("SELL", userA.id, user1.id, item3.id, Decimal("3"))))
+    elif type is False:
+        correct.add(frozenset(("BUY", user1.id, userA.id, item1.id, Decimal("1"))))
+        correct.add(frozenset(("BUY", user1.id, userA.id, item2.id, Decimal("2"))))
+    else:
+        correct.add(frozenset(("SELL", userA.id, user1.id, item3.id, Decimal("3"))))
+        correct.add(frozenset(("BUY", user1.id, userA.id, item1.id, Decimal("1"))))
+        correct.add(frozenset(("BUY", user1.id, userA.id, item2.id, Decimal("2"))))
 
     validate_results(
         response_body,
