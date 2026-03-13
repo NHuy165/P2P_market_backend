@@ -110,8 +110,8 @@ app.include_router(
 
 admin_router.include_router(
     transactions.admin.router,
-    prefix="/items",
-    tags=["items"],
+    prefix="/transactions",
+    tags=["transactions"],
 )
 
 # ----- Admin ----- #

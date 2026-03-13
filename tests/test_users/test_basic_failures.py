@@ -4,6 +4,7 @@ from typing import Any, Callable
 import pytest
 from httpx import AsyncClient
 from pydantic import EmailStr
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exceptions.core import ExceptionResponse, ExceptionType
 from src.models_schemas.users import (
@@ -26,6 +27,7 @@ from tests.utils import response_validator_single
 )
 async def test_register_user(
     client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     username: str,
     email: EmailStr,
@@ -44,6 +46,8 @@ async def test_register_user(
         email=email,
         password="user1-password",
     )
+
+    session.expire_all()
 
     response = await client.post("/users/register", json=user.model_dump())
 
@@ -80,6 +84,7 @@ async def test_register_user(
 )
 async def test_login(
     client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     username: str,
     password: str,
@@ -95,6 +100,8 @@ async def test_login(
 
     await create_user("user1")
     await create_user("userB", status=user_status)
+
+    session.expire_all()
 
     response = await client.post(
         "/login",
@@ -112,10 +119,12 @@ async def test_login(
 # ----- User read ----- #
 
 
-async def test_read_user_admin(authorized_client: AsyncClient):
+async def test_read_user_admin(authorized_client: AsyncClient, session: AsyncSession):
     """
     Tries to access an admin endpoint as a normal user.
     """
+
+    session.expire_all()
 
     response = await authorized_client.get("/admin/users/me")
 
@@ -141,10 +150,14 @@ async def test_read_user_admin(authorized_client: AsyncClient):
         {"email": "gibberish"},
     ],
 )
-async def test_update_user(authorized_client: AsyncClient, update: dict):
+async def test_update_user(
+    authorized_client: AsyncClient, session: AsyncSession, update: dict
+):
     """
     Fails to edit profile with erroneous values.
     """
+
+    session.expire_all()
 
     response = await authorized_client.patch("/users/update", json=update)
 
@@ -156,7 +169,7 @@ async def test_update_user(authorized_client: AsyncClient, update: dict):
     )
 
 
-async def test_update_password(authorized_client: AsyncClient):
+async def test_update_password(authorized_client: AsyncClient, session: AsyncSession):
     """
     Tries changing password using wrong credentials.
     """
@@ -164,6 +177,8 @@ async def test_update_password(authorized_client: AsyncClient):
         old_password="userA-wrong-password",
         new_password="userA-new-password",
     )
+
+    session.expire_all()
 
     response = await authorized_client.patch(
         "/users/change_password", json=update.model_dump()
@@ -180,10 +195,12 @@ async def test_update_password(authorized_client: AsyncClient):
 # ----- User delete ----- #
 
 
-async def test_delete_user(authorized_client: AsyncClient):
+async def test_delete_user(authorized_client: AsyncClient, session: AsyncSession):
     """
     Tries deleting account using wrong credentials.
     """
+
+    session.expire_all()
 
     response = await authorized_client.post(
         "/users/delete",
@@ -208,6 +225,7 @@ async def test_delete_user(authorized_client: AsyncClient):
 )
 async def test_ban_user(
     admin_client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     user_status: UserStatus,
     is_admin: bool,
@@ -223,6 +241,8 @@ async def test_ban_user(
     user1 = await create_user("user1", status=user_status, is_admin=is_admin)
     user1_id = user1.id
 
+    session.expire_all()
+
     response = await admin_client.post(f"/admin/users/{user1_id}/ban")
 
     response_validator_single(
@@ -235,6 +255,7 @@ async def test_ban_user(
 
 async def test_unban_user(
     admin_client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
 ):
     """
@@ -243,6 +264,8 @@ async def test_unban_user(
 
     user1 = await create_user("user1")
     user1_id = user1.id
+
+    session.expire_all()
 
     response = await admin_client.post(f"/admin/users/{user1_id}/unban")
 

@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from src.models_schemas.enums import CompareOperator
 from src.models_schemas.items import (
@@ -20,7 +21,7 @@ from tests.utils import model_validator, response_validator_single
 # ----- Item create ----- #
 
 
-async def test_create_item(authorized_client: AsyncClient):
+async def test_create_item(authorized_client: AsyncClient, session: AsyncSession):
     """
     Creates an item.
     """
@@ -32,6 +33,8 @@ async def test_create_item(authorized_client: AsyncClient):
         stock_quantity=5,
         status=ItemStatus.SUSPENDED,
     )
+
+    session.expire_all()
 
     response = await authorized_client.post(
         "/items/create",
@@ -70,6 +73,7 @@ async def test_create_item(authorized_client: AsyncClient):
 )
 async def test_read_private_items_all(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     items_list: list[tuple[str, ItemStatus]],
@@ -81,6 +85,8 @@ async def test_read_private_items_all(
 
     for item_name, item_status in items_list:
         await create_item(name=item_name, seller=userA, status=item_status)
+
+    session.expire_all()
 
     response = await authorized_client.post("/items/my-items")
 
@@ -117,6 +123,7 @@ async def test_read_private_items_all(
 )
 async def test_read_private_items_all_admin(
     admin_client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     user_status: UserStatus,
@@ -131,6 +138,8 @@ async def test_read_private_items_all_admin(
 
     for item_name, item_status in items_list:
         await create_item(name=item_name, seller=user1, status=item_status)
+
+    session.expire_all()
 
     response = await admin_client.post(f"/admin/items/{user1_id}")
 
@@ -156,6 +165,7 @@ async def test_read_private_items_all_admin(
 )
 async def test_read_private_item_one(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     item_status: ItemStatus,
@@ -166,6 +176,8 @@ async def test_read_private_item_one(
 
     item = await create_item(name="item1", seller=userA, status=item_status)
     item_id = item.id
+
+    session.expire_all()
 
     response = await authorized_client.get(f"/items/my-items/{item_id}")
 
@@ -185,6 +197,7 @@ async def test_read_private_item_one(
 )
 async def test_read_private_item_one_admin(
     admin_client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     item_status: ItemStatus,
@@ -198,6 +211,8 @@ async def test_read_private_item_one_admin(
     item = await create_item(name="item1", seller=user1, status=item_status)
     item_id = item.id
 
+    session.expire_all()
+
     response = await admin_client.get(f"/admin/items/{item_id}")
 
     response_validator_single(
@@ -207,6 +222,7 @@ async def test_read_private_item_one_admin(
 
 async def test_read_public_items_all(
     client: AsyncClient,
+    session: AsyncSession,
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     quick_login: Callable[..., CoroutineType[Any, Any, None]],
@@ -230,6 +246,8 @@ async def test_read_public_items_all(
 
     # === Viewing as a guest === #
 
+    session.expire_all()
+
     response1 = await client.post("items")
 
     response_validator_single(response1, 200)
@@ -248,6 +266,8 @@ async def test_read_public_items_all(
     token = await quick_login("user1")
     client.headers.update(token)
 
+    session.expire_all()
+
     response2 = await client.post("items")
 
     response_validator_single(response2, 200)
@@ -264,6 +284,7 @@ async def test_read_public_items_all(
 
 async def test_read_public_item_one(
     client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     quick_login: Callable[..., CoroutineType[Any, Any, None]],
@@ -282,6 +303,8 @@ async def test_read_public_item_one(
 
     # === Viewing as a guest === #
 
+    session.expire_all()
+
     response1 = await client.get(f"/items/{item1_id}")
 
     response_validator_single(response1, 200, ItemOutputPublic, {"name": "item1"})
@@ -291,11 +314,15 @@ async def test_read_public_item_one(
     token = await quick_login("user1")
     client.headers.update(token)
 
+    session.expire_all()
+
     response2 = await client.get(f"/items/{item1_id}")
 
     response_validator_single(response2, 200, ItemOutputPublic, {"name": "item1"})
 
     # === Viewing item2 as user1 === #
+
+    session.expire_all()
 
     response3 = await client.get(f"/items/{item2_id}")
 
@@ -319,6 +346,7 @@ async def test_read_public_item_one(
 )
 async def test_update_item(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     item_update: dict,
@@ -336,6 +364,8 @@ async def test_update_item(
         status=ItemStatus.ACTIVE,
     )
     item1_id = item1.id
+
+    session.expire_all()
 
     response = await authorized_client.patch(f"/items/{item1_id}", json=item_update)
 
@@ -357,6 +387,7 @@ async def test_update_item(
 )
 async def test_suspend_all_items(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     items_list: list[tuple[str, ItemStatus]],
@@ -368,6 +399,8 @@ async def test_suspend_all_items(
 
     for item_name, item_status in items_list:
         await create_item(name=item_name, seller=userA, status=item_status)
+
+    session.expire_all()
 
     response = await authorized_client.patch("/items/")
 
@@ -397,6 +430,7 @@ async def test_suspend_all_items(
 )
 async def test_delete_item(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     item_status: ItemStatus,
@@ -407,6 +441,8 @@ async def test_delete_item(
 
     item1 = await create_item(name="item1", seller=userA, status=item_status)
     item1_id = item1.id
+
+    session.expire_all()
 
     response = await authorized_client.delete(f"/items/{item1_id}")
 
@@ -427,6 +463,7 @@ async def test_delete_item(
 )
 async def test_ban_item(
     admin_client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     item_status: ItemStatus,
@@ -438,6 +475,8 @@ async def test_ban_item(
     user1 = await create_user("user1")
     item1 = await create_item(name="item1", seller=user1, status=item_status)
     item1_id = item1.id
+
+    session.expire_all()
 
     response = await admin_client.post(f"/admin/items/{item1_id}/ban")
 
@@ -451,6 +490,7 @@ async def test_ban_item(
 
 async def test_unban_item(
     admin_client: AsyncClient,
+    session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
 ):
@@ -461,6 +501,8 @@ async def test_unban_item(
     user1 = await create_user("user1")
     item1 = await create_item(name="item1", seller=user1, status=ItemStatus.BANNED)
     item1_id = item1.id
+
+    session.expire_all()
 
     response = await admin_client.post(f"/admin/items/{item1_id}/unban")
 

@@ -58,7 +58,7 @@ def response_validator_single(
 def validate_results(
     data: list,
     columns: list[str],
-    correct: set[frozenset],
+    correct: set[tuple],
     validate: type[BaseModel] | None = None,
 ):
     current = set()
@@ -72,7 +72,7 @@ def validate_results(
             info = getattr(tran, col)
             tran_info.append(info)
 
-        current.add(frozenset(tran_info))
+        current.add(tuple(tran_info))
 
     try:
         assert current == correct

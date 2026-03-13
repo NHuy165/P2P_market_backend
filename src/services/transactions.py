@@ -21,7 +21,7 @@ from ..repository.users import GetUser
 # ----- Transaction create ----- #
 
 
-async def change_money(
+async def change_money_service(
     user: User,
     session: AsyncSession,
     inp: TransactionInput,
@@ -41,7 +41,7 @@ async def change_money(
         assert user.id is not None
         raise ExceptionNotFound_404(ObjectType.USER, user.id)
 
-    if trans_type.value is TransactionType.WITHDRAWAL:
+    if trans_type == TransactionType.WITHDRAWAL:
         if user_wfu.balance < inp.amount:
             raise ExceptionInvalidValue_409(
                 "Account balance", user_wfu.balance - inp.amount
@@ -67,7 +67,7 @@ async def change_money(
     return trans
 
 
-async def change_money_admin(
+async def change_money_admin_service(
     session: AsyncSession,
     user_id: int,
     inp: TransactionInput,
@@ -82,7 +82,7 @@ async def change_money_admin(
     if user_wfu is None:
         raise ExceptionNotFound_404(ObjectType.USER, user_id)
 
-    if trans_type.value is TransactionType.ADMIN_SUBTRACT:
+    if trans_type == TransactionType.ADMIN_SUBTRACT:
         if user_wfu.balance < inp.amount:
             raise ExceptionInvalidValue_409(
                 "Account balance", user_wfu.balance - inp.amount

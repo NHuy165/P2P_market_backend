@@ -36,10 +36,13 @@ class TransactionInput(TransactionBase):
 # Transaction history are only shown to account owner and admins
 class TransactionOutput(TransactionBase):
     id: int
-    type: TransactionType
+    order_id: int | None
     user_id: int
+
     created_at: datetime
     finished_at: datetime | None
+
+    type: TransactionType
     status: TransactionStatus
 
 

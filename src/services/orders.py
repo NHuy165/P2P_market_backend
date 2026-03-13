@@ -256,7 +256,7 @@ async def approve_order_service(session: AsyncSession, order_id: int) -> Order:
 async def complete_order_service(session: AsyncSession, order_id: int) -> Order:
     get_order = GetOrder()
     get_order.base_none()
-    get_order.eager_load(["transactions"])
+    get_order.eager_load(["transactions", "seller"])
     get_order.get_by("id", order_id)
 
     order = await get_order.get_one(session, with_for_update=True)
@@ -331,7 +331,7 @@ async def delete_order_service(
 
     get_order = GetOrder()
     get_order.base_both(user_wfu.id)
-    get_order.eager_load(["transactions"])
+    get_order.eager_load(["transactions", "item", "buyer"])
     get_order.get_by("id", order_id)
 
     order = await get_order.get_one(session, with_for_update=True)
@@ -355,7 +355,7 @@ async def delete_order_service(
 async def delete_order_admin_service(session: AsyncSession, order_id: int) -> Order:
     get_order = GetOrder()
     get_order.base_none()
-    get_order.eager_load(["transactions"])
+    get_order.eager_load(["transactions", "item", "buyer"])
     get_order.get_by("id", order_id)
 
     order = await get_order.get_one(session, with_for_update=True)

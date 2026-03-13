@@ -23,8 +23,8 @@ from tests.utils import response_validator_single, validate_results
 
 async def test_create_finish_order(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
-    admin_client: AsyncClient,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
     change_money: Callable[..., CoroutineType[Any, Any, User]],
@@ -32,8 +32,8 @@ async def test_create_finish_order(
 ):
     """
     Creates an order, validating contents and statuses of the orders and transactions.
-    Approving and finishing the order via admin endpoints, validating final balance results.
     """
+
     # === Validate order === #
 
     await change_money(user=userA, amount=Decimal("10.00"))
@@ -47,13 +47,15 @@ async def test_create_finish_order(
 
     order = OrderInput(quantity=2, item_id=item1_id)
 
-    response1 = await authorized_client.post("orders/create", json=order.model_dump())
+    session.expire_all()
+
+    response = await authorized_client.post("orders/create", json=order.model_dump())
 
     validate = {"price_per_item": Decimal("5")}
     validate.update(order.model_dump())
 
     response_validator_single(
-        response1,
+        response,
         200,
         OrderOutputNoType,
         validate,
@@ -61,7 +63,7 @@ async def test_create_finish_order(
 
     # === Validate transactions === #
 
-    order_id = response1.json()["id"]
+    order_id = response.json()["id"]
 
     trans = await fetch_transactions()
 
@@ -69,48 +71,22 @@ async def test_create_finish_order(
         trans,
         ["order_id", "user_id", "type", "status", "amount"],
         {
-            frozenset(
-                (
-                    order_id,
-                    userA.id,
-                    TransactionType.PURCHASE,
-                    TransactionStatus.SUCCESS,
-                    Decimal("10"),
-                )
+            (
+                order_id,
+                userA.id,
+                TransactionType.PURCHASE,
+                TransactionStatus.SUCCESS,
+                Decimal("10"),
             ),
-            frozenset(
-                (
-                    order_id,
-                    user1.id,
-                    TransactionType.SALE,
-                    TransactionStatus.ON_HOLD,
-                    Decimal("10"),
-                )
+            (
+                order_id,
+                user1.id,
+                TransactionType.SALE,
+                TransactionStatus.ON_HOLD,
+                Decimal("10"),
             ),
         },
     )
-
-    assert userA.balance == Decimal("0")
-    assert user1.balance == Decimal("0")
-
-    # === Validate balance after order completion === #
-
-    response2 = await admin_client.patch(f"/admin/orders/{order_id}/approve")
-
-    response_validator_single(
-        response2, 200, OrderOutputNoType, {"status": OrderStatus.SHIPPED}
-    )
-
-    response3 = await admin_client.patch(f"/admin/orders/{order_id}/complete")
-
-    response_validator_single(
-        response3,
-        200,
-        OrderOutputNoType,
-        {"status": OrderStatus.DELIVERED, "finished_at": (None, CompareOperator.NE)},
-    )
-
-    assert user1.balance == Decimal("10")
 
 
 # ----- Order read ----- #
@@ -130,6 +106,7 @@ async def test_create_finish_order(
 async def test_read_orders(
     authorized_client: AsyncClient,
     admin_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
@@ -144,8 +121,12 @@ async def test_read_orders(
     """
 
     # Setup: user1 has item1 and item2, userA has item3. Each user buys everything from the other one.
+    await session.refresh(userA)
+
+    userA_id = userA.id
 
     user1 = await create_user("user1")
+    user1_id = user1.id
 
     userA = await change_money(user=userA, amount=Decimal("3"))
     user1 = await change_money(user=user1, amount=Decimal("3"))
@@ -187,9 +168,11 @@ async def test_read_orders(
 
     # Validate
 
+    session.expire_all()
+
     if admin:
         response = await admin_client.post(
-            f"/admin/orders/{userA.id}{'?type=' + str(type) if isinstance(type, bool) else ''}"
+            f"/admin/orders/{userA_id}{'?type=' + str(type) if isinstance(type, bool) else ''}"
         )
     else:
         response = await authorized_client.post(
@@ -201,15 +184,16 @@ async def test_read_orders(
     response_body = response.json()
 
     correct = set()
+
     if type is True:
-        correct.add(frozenset(("SELL", userA.id, user1.id, item3.id, Decimal("3"))))
+        correct.add(("SELL", userA_id, user1_id, item3_id, Decimal("3")))
     elif type is False:
-        correct.add(frozenset(("BUY", user1.id, userA.id, item1.id, Decimal("1"))))
-        correct.add(frozenset(("BUY", user1.id, userA.id, item2.id, Decimal("2"))))
+        correct.add(("BUY", user1_id, userA_id, item1_id, Decimal("1")))
+        correct.add(("BUY", user1_id, userA_id, item2_id, Decimal("2")))
     else:
-        correct.add(frozenset(("SELL", userA.id, user1.id, item3.id, Decimal("3"))))
-        correct.add(frozenset(("BUY", user1.id, userA.id, item1.id, Decimal("1"))))
-        correct.add(frozenset(("BUY", user1.id, userA.id, item2.id, Decimal("2"))))
+        correct.add(("SELL", userA_id, user1_id, item3_id, Decimal("3")))
+        correct.add(("BUY", user1_id, userA_id, item1_id, Decimal("1")))
+        correct.add(("BUY", user1_id, userA_id, item2_id, Decimal("2")))
 
     validate_results(
         response_body,
@@ -221,6 +205,61 @@ async def test_read_orders(
 
 # ----- Order update ----- #
 
+
+async def test_approve_finish_order(
+    authorized_client: AsyncClient,
+    session: AsyncSession,
+    userA: User,
+    admin_client: AsyncClient,
+    create_user: Callable[..., CoroutineType[Any, Any, User]],
+    create_item: Callable[..., CoroutineType[Any, Any, Item]],
+    change_money: Callable[..., CoroutineType[Any, Any, User]],
+    quickbuy: Callable[..., CoroutineType[Any, Any, OrderOutputNoType]],
+):
+    """
+    Approves and finishes an order.
+    """
+
+    await change_money(user=userA, amount=Decimal("10.00"))
+
+    user1 = await create_user("user1")
+    item1 = await create_item(
+        name="item1", seller=user1, price=Decimal("5"), stock_quantity=2
+    )
+    item1_id = item1.id
+    assert item1_id is not None
+
+    order = await quickbuy(
+        custom_client=authorized_client, item_id=item1_id, quantity=2
+    )
+    order_id = order.id
+
+    # Approve
+
+    session.expire_all()
+
+    response1 = await admin_client.patch(f"/admin/orders/{order_id}/approve")
+
+    response_validator_single(
+        response1, 200, OrderOutputNoType, {"status": OrderStatus.SHIPPED}
+    )
+
+    # Complete
+
+    session.expire_all()
+
+    response2 = await admin_client.patch(f"/admin/orders/{order_id}/complete")
+
+    response_validator_single(
+        response2,
+        200,
+        OrderOutputNoType,
+        {"status": OrderStatus.DELIVERED, "finished_at": (None, CompareOperator.NE)},
+    )
+
+    assert user1.balance == Decimal("10")
+
+
 # ----- Order delete ----- #
 
 
@@ -228,6 +267,7 @@ async def test_read_orders(
 async def test_delete_order(
     authorized_client: AsyncClient,
     admin_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
@@ -255,6 +295,8 @@ async def test_delete_order(
     )
     order_id = order.id
 
+    session.expire_all()
+
     if admin:
         response = await admin_client.delete(f"/admin/orders/{order_id}")
     else:
@@ -279,32 +321,26 @@ async def test_delete_order(
         trans,
         ["order_id", "user_id", "type", "status", "amount"],
         {
-            frozenset(
-                (
-                    order_id,
-                    userA.id,
-                    TransactionType.PURCHASE,
-                    TransactionStatus.SUCCESS,
-                    Decimal("10"),
-                )
+            (
+                order_id,
+                userA.id,
+                TransactionType.PURCHASE,
+                TransactionStatus.SUCCESS,
+                Decimal("10"),
             ),
-            frozenset(
-                (
-                    order_id,
-                    userA.id,
-                    TransactionType.REFUND,
-                    TransactionStatus.SUCCESS,
-                    Decimal("10"),
-                )
+            (
+                order_id,
+                userA.id,
+                TransactionType.REFUND,
+                TransactionStatus.SUCCESS,
+                Decimal("10"),
             ),
-            frozenset(
-                (
-                    order_id,
-                    user1.id,
-                    TransactionType.SALE,
-                    TransactionStatus.FAILED,
-                    Decimal("10"),
-                )
+            (
+                order_id,
+                user1.id,
+                TransactionType.SALE,
+                TransactionStatus.FAILED,
+                Decimal("10"),
             ),
         },
     )

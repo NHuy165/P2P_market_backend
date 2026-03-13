@@ -9,7 +9,7 @@ from ...models_schemas.transactions import (
     TransactionType,
 )
 from ...repository.core import CriterionInput
-from ...services.transactions import change_money, read_transactions_service
+from ...services.transactions import change_money_service, read_transactions_service
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ router = APIRouter()
     },
 )
 async def deposit(user: UserDep, session: SessionDep, inp: TransactionInput):
-    trans = await change_money(user, session, inp, TransactionType.DEPOSIT)
+    trans = await change_money_service(user, session, inp, TransactionType.DEPOSIT)
     return trans
 
 
@@ -41,7 +41,7 @@ async def deposit(user: UserDep, session: SessionDep, inp: TransactionInput):
     },
 )
 async def withdraw(user: UserDep, session: SessionDep, inp: TransactionInput):
-    trans = await change_money(user, session, inp, TransactionType.WITHDRAWAL)
+    trans = await change_money_service(user, session, inp, TransactionType.WITHDRAWAL)
     return trans
 
 

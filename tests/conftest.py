@@ -222,6 +222,14 @@ async def complete_order_fixture(admin_client: AsyncClient):
     return complete_order
 
 
+@pytest.fixture(name="cancel_order")
+async def cancel_order_fixture(admin_client: AsyncClient):
+    async def cancel_order(order_id: int):
+        await admin_client.delete(f"/admin/orders/{order_id}")
+
+    return cancel_order
+
+
 @pytest.fixture(name="quickbuy")
 async def quickbuy_fixture():
     async def quickbuy(

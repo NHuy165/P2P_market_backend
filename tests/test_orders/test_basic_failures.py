@@ -4,6 +4,7 @@ from typing import Any, Callable
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from src.exceptions.core import ExceptionResponse, ExceptionType
 from src.models_schemas.enums import ItemStatus
@@ -24,6 +25,7 @@ from tests.utils import response_validator_single
 )
 async def test_create_order(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
@@ -53,13 +55,15 @@ async def test_create_order(
 
     order = OrderInput(quantity=quantity, item_id=item1_id)
 
+    session.expire_all()
+
     response = await authorized_client.post("orders/create", json=order.model_dump())
 
     response_validator_single(
         response,
         status_code,
         ExceptionResponse,
-        {"exception_type": exception_type.value},
+        {"exception_type": exception_type},
     )
 
 
@@ -78,6 +82,7 @@ async def test_create_order(
 )
 async def test_approve_complete_order(
     authorized_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     admin_client: AsyncClient,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
@@ -108,13 +113,15 @@ async def test_approve_complete_order(
 
     await complete_order(order_id=order_id)
 
+    session.expire_all()
+
     response = await admin_client.patch(f"/admin/orders/{order_id}/{action}")
 
     response_validator_single(
         response,
         409,
         ExceptionResponse,
-        {"exception_type": ExceptionType.INVALID_STATUS.value},
+        {"exception_type": ExceptionType.INVALID_STATUS},
     )
 
 
@@ -125,6 +132,7 @@ async def test_approve_complete_order(
 async def test_delete_order(
     authorized_client: AsyncClient,
     admin_client: AsyncClient,
+    session: AsyncSession,
     userA: User,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
     create_item: Callable[..., CoroutineType[Any, Any, Item]],
@@ -153,6 +161,8 @@ async def test_delete_order(
 
     await complete_order(order_id=order_id)
 
+    session.expire_all()
+
     if admin:
         response = await admin_client.delete(f"/admin/orders/{order_id}")
     else:
@@ -162,5 +172,5 @@ async def test_delete_order(
         response,
         409,
         ExceptionResponse,
-        {"exception_type": ExceptionType.INVALID_STATUS.value},
+        {"exception_type": ExceptionType.INVALID_STATUS},
     )
