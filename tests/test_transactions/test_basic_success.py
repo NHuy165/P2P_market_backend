@@ -16,48 +16,24 @@ from tests.utils import response_validator_single, validate_results
 # ----- Transaction create ----- #
 
 
-async def test_deposit(
-    authorized_client: AsyncClient,
-    session: AsyncSession,
-    userA: User,
-):
-    """
-    Deposits money.
-    """
-
-    inp = TransactionInput(
-        amount=Decimal("10"),
-    )
-
-    session.expire_all()
-
-    response = await authorized_client.post(
-        "/transactions/deposit", json=inp.model_dump(mode="json")
-    )
-
-    response_validator_single(
-        response,
-        200,
-        TransactionOutput,
-        {
-            "user_id": userA.id,
-            "type": TransactionType.DEPOSIT,
-            "status": TransactionStatus.SUCCESS,
-            "amount": Decimal("10"),
-        },
-    )
-
-    assert userA.balance == Decimal("10")
-
-
-async def test_withdraw(
+@pytest.mark.parametrize(
+    "action, trans_type, final_balance",
+    [
+        ("deposit", TransactionType.DEPOSIT, Decimal("20")),
+        ("withdraw", TransactionType.WITHDRAWAL, Decimal("0")),
+    ],
+)
+async def test_deposit_withdraw(
     authorized_client: AsyncClient,
     session: AsyncSession,
     userA: User,
     change_money: Callable[..., CoroutineType[Any, Any, User]],
+    action: str,
+    trans_type: TransactionType,
+    final_balance: Decimal,
 ):
     """
-    Withdraws money.
+    Deposits and withdraws money.
     """
 
     await change_money(user=userA, amount=Decimal("10"))
@@ -69,7 +45,7 @@ async def test_withdraw(
     session.expire_all()
 
     response = await authorized_client.post(
-        "/transactions/withdraw", json=inp.model_dump(mode="json")
+        f"/transactions/{action}", json=inp.model_dump(mode="json")
     )
 
     response_validator_single(
@@ -78,59 +54,32 @@ async def test_withdraw(
         TransactionOutput,
         {
             "user_id": userA.id,
-            "type": TransactionType.WITHDRAWAL,
+            "type": trans_type,
             "status": TransactionStatus.SUCCESS,
             "amount": Decimal("10"),
         },
     )
 
-    assert userA.balance == Decimal("0")
+    assert userA.balance == final_balance
 
 
-async def test_add_admin(
+@pytest.mark.parametrize(
+    "action, trans_type, final_balance",
+    [
+        ("add", TransactionType.ADMIN_ADD, Decimal("20")),
+        ("subtract", TransactionType.ADMIN_SUBTRACT, Decimal("0")),
+    ],
+)
+async def test_add_subtract_admin(
     admin_client: AsyncClient,
     session: AsyncSession,
     create_user: Callable[..., CoroutineType[Any, Any, User]],
+    action: str,
+    trans_type: TransactionType,
+    final_balance: Decimal,
 ):
     """
-    Adds money to an account as an admin.
-    """
-
-    user1 = await create_user("user1")
-    user1_id = user1.id
-
-    inp = TransactionInput(
-        amount=Decimal("10"),
-    )
-
-    session.expire_all()
-
-    response = await admin_client.post(
-        f"/admin/transactions/{user1_id}/add", json=inp.model_dump(mode="json")
-    )
-
-    response_validator_single(
-        response,
-        200,
-        TransactionOutput,
-        {
-            "user_id": user1_id,
-            "type": TransactionType.ADMIN_ADD,
-            "status": TransactionStatus.SUCCESS,
-            "amount": Decimal("10"),
-        },
-    )
-
-    assert user1.balance == Decimal("10")
-
-
-async def test_subtract_admin(
-    admin_client: AsyncClient,
-    session: AsyncSession,
-    create_user: Callable[..., CoroutineType[Any, Any, User]],
-):
-    """
-    Subtracts money from an account as an admin.
+    Adds and subtracts money to and from an account as an admin.
     """
 
     user1 = await create_user("user1", balance=Decimal("10"))
@@ -143,7 +92,7 @@ async def test_subtract_admin(
     session.expire_all()
 
     response = await admin_client.post(
-        f"/admin/transactions/{user1_id}/subtract", json=inp.model_dump(mode="json")
+        f"/admin/transactions/{user1_id}/{action}", json=inp.model_dump(mode="json")
     )
 
     response_validator_single(
@@ -152,13 +101,13 @@ async def test_subtract_admin(
         TransactionOutput,
         {
             "user_id": user1_id,
-            "type": TransactionType.ADMIN_SUBTRACT,
+            "type": trans_type,
             "status": TransactionStatus.SUCCESS,
             "amount": Decimal("10"),
         },
     )
 
-    assert user1.balance == Decimal("0")
+    assert user1.balance == final_balance
 
 
 # ----- Transaction read ----- #
